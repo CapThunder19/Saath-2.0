@@ -16,6 +16,14 @@ export const EVENT = {
   activity: "Artwork Collection & Drawing Competition",
 };
 
+// What's printed on each member's entry ticket.
+export const TICKET = {
+  label: "Diwali Special Entry",
+  date: "27 October",
+  time: "4:00 PM – 6:30 PM",
+  venue: "College Amphitheater",
+};
+
 // Suggestions only: students can still type a course or branch that isn't listed.
 export const COURSES = ["B.Tech", "BCA", "BBA", "B.Com", "B.Sc", "BA", "MCA", "MBA", "M.Tech", "Diploma"];
 export const BRANCHES = ["CSE", "CSE (AI & ML)", "CSE (Data Science)", "IT", "ECE", "EE", "ME", "CE", "Biotechnology"];

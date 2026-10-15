@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toPng } from "html-to-image";
+import { Ticket, TicketScaler } from "@/components/Ticket";
 import {
   BRANCHES,
   COLLEGE_EMAIL_DOMAIN,
@@ -27,6 +29,28 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
   const [regId, setRegId] = useState("");
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [downloading, setDownloading] = useState(false);
+  const ticketRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  async function downloadTicket(i: number) {
+    const node = ticketRefs.current[i];
+    if (!node) return;
+    const url = await toPng(node, { pixelRatio: 2, cacheBust: true });
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Saath-2.0-ticket-${members[i].name.trim().replace(/\s+/g, "-")}.png`;
+    a.click();
+  }
+
+  async function downloadAll() {
+    setDownloading(true);
+    try {
+      for (let i = 0; i < members.length; i++) await downloadTicket(i);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   function clearError(i: number, key: keyof MemberErrors) {
     setErrors((all) => all.map((e, j) => (j === i && e[key] ? { ...e, [key]: undefined } : e)));
@@ -71,6 +95,8 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
         }
         throw new Error(json.error || "Something went wrong.");
       }
+      // Tickets embed the photos as data URLs so the downloaded PNGs include them.
+      setPhotoUrls(await Promise.all(photos.map((p) => readAsDataUrl(p!))));
       setRegId(json.registrationId);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -82,24 +108,47 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
 
   if (regId) {
     return (
-      <div className="form-wrapper">
-        <div className="success">
+      <div className="tickets-page">
+        <div className="success tickets-intro">
           <div className="check">✓</div>
-          <h2>Registration successful!</h2>
+          <h2>{team.size === 1 ? `You're in, ${members[0].name.split(" ")[0]}!` : "Your team is registered!"}</h2>
           <p>
-            {team.size === 1 ? `Thank you, ${members[0].name.split(" ")[0]}!` : "Your team is registered!"} See you at{" "}
-            {EVENT.name}: {EVENT.tagline}.
+            Registration ID <strong className="reg-id-inline">{regId}</strong>
           </p>
-          <p>Your registration ID is:</p>
-          <div className="reg-id">{regId}</div>
-          {team.size > 1 && <p>Registered members: {members.map((m) => m.name).join(", ")}</p>}
           <p>
-            {EVENT.date} · {EVENT.venue}
+            Download {team.size === 1 ? "your entry ticket" : `all ${team.size} entry tickets`} and show{" "}
+            {team.size === 1 ? "it" : "them"} at the entry. {team.size > 1 && "Each member needs their own ticket."}
           </p>
-          <Link href="/" className="btn btn-primary" style={{ marginTop: 24 }}>
-            Back to home
-          </Link>
+          <div className="tickets-actions">
+            <button className="btn btn-primary" onClick={downloadAll} disabled={downloading}>
+              {downloading ? "Preparing..." : team.size === 1 ? "Download ticket" : `Download all ${team.size} tickets`}
+            </button>
+            <Link href="/" className="btn btn-outline">Back to home</Link>
+          </div>
         </div>
+
+        {members.map((m, i) => (
+          <div className="ticket-card" key={i}>
+            <TicketScaler>
+              <Ticket
+                ref={(el) => {
+                  ticketRefs.current[i] = el;
+                }}
+                name={m.name}
+                branch={m.branch}
+                photo={photoUrls[i]}
+                registrationId={regId}
+                memberNo={i + 1}
+                teamSize={team.size}
+              />
+            </TicketScaler>
+            {team.size > 1 && (
+              <button className="text-link ticket-download" onClick={() => downloadTicket(i)}>
+                Download {m.name.split(" ")[0]}&apos;s ticket ↓
+              </button>
+            )}
+          </div>
+        ))}
       </div>
     );
   }
@@ -143,6 +192,15 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
       </form>
     </div>
   );
+}
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 function focusFirstError(errors: MemberErrors[]) {

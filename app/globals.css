@@ -892,3 +892,50 @@ body > main, .site-footer { position: relative; z-index: 1; }
   .team-option { padding: 26px 20px 22px; }
   .member-block { padding: 18px 14px 4px; }
 }
+
+/* Entry tickets (shown after registration, downloadable as PNG). Fixed 1000px layout. */
+.tickets-page { max-width: 1000px; margin: 0 auto; }
+.tickets-intro { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 40px 28px; margin-bottom: 28px; }
+.reg-id-inline { color: var(--primary); letter-spacing: 1px; }
+.tickets-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; margin-top: 22px; }
+.ticket-card { margin-bottom: 28px; }
+.ticket-download { display: inline-block; margin-top: 10px; background: none; border: 0; border-bottom: 1px solid var(--border); color: var(--text); cursor: pointer; font: inherit; font-size: .85rem; }
+.ticket-scaler { width: 100%; overflow: hidden; }
+
+.ticket-frame { --frame: #e8e1d5; --maroon: #4a0f1e; --gold: #f4b740; --cream: #fdf0d5; --rose: #e9c6bc; background: var(--frame); padding: 24px; width: 1000px; }
+.ticket { position: relative; overflow: hidden; background: var(--maroon); border-radius: 14px; color: var(--cream); }
+/* Scalloped edges: half-circles of the frame colour biting into every side. */
+.ticket::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 0, var(--frame) 8px, transparent 8.5px) 0 0 / 24px 100% repeat-x,
+    radial-gradient(circle at 50% 100%, var(--frame) 8px, transparent 8.5px) 0 0 / 24px 100% repeat-x,
+    radial-gradient(circle at 0 50%, var(--frame) 8px, transparent 8.5px) 0 0 / 100% 24px repeat-y,
+    radial-gradient(circle at 100% 50%, var(--frame) 8px, transparent 8.5px) 0 0 / 100% 24px repeat-y;
+}
+.ticket-rangoli { position: absolute; z-index: 0; width: 250px; right: 170px; bottom: -95px; opacity: .22; }
+.ticket-inner { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 240px; margin: 22px; border: 1px dashed #f4b74055; border-radius: 10px; }
+.ticket-main { padding: 22px 26px 24px 26px; border-right: 2px dashed #f4b74099; min-width: 0; }
+.ticket-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.ticket-pill { justify-self: start; background: var(--gold); color: var(--maroon); border-radius: 99px; padding: 8px 16px; font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
+.ticket-org { color: var(--gold); font-size: 38px; font-weight: 700; letter-spacing: 10px; line-height: 1; }
+.ticket-admit { justify-self: end; color: var(--rose); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; }
+.ticket-title-row { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
+.ticket-title { font-size: 80px; font-weight: 800; line-height: .95; letter-spacing: -3px; color: var(--cream); }
+.ticket-tagline { font-size: 28px; font-weight: 700; color: var(--gold); margin-top: 8px; }
+.ticket-diya { width: 128px; flex-shrink: 0; margin-right: 6px; }
+.ticket-details { display: grid; grid-template-columns: .8fr 1fr 1.15fr; gap: 18px; margin-top: 30px; }
+.ticket-details span, .ticket-member span { display: block; font-size: 10px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase; color: var(--rose); }
+.ticket-details strong { display: block; margin-top: 5px; font-size: 18px; font-weight: 700; color: var(--cream); white-space: nowrap; }
+.ticket-member { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #ffffff30; }
+.ticket-member span { color: var(--gold); }
+.ticket-member strong { display: block; margin-top: 6px; padding-bottom: 6px; border-bottom: 1px solid #ffffff45; font-size: 24px; font-weight: 500; color: var(--cream); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ticket-stub { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 20px; }
+.ticket-photo { width: 172px; height: 214px; padding: 5px; border: 2.5px dashed var(--gold); border-radius: 16px; background: #5c1a2e; }
+.ticket-photo img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 11px; }
+.ticket-id { margin-top: 12px; font-size: 12px; font-weight: 600; letter-spacing: 1.5px; color: var(--rose); text-align: center; }
+.ticket-id span { color: var(--gold); }
