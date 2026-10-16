@@ -66,7 +66,7 @@ export async function POST(req: Request) {
       for (const i of result.duplicates) errors[i].admissionNo = "This admission number is already registered.";
       return invalid(errors, "Some members are already registered.", 409);
     }
-    // Tickets are emailed once an admin approves the registration.
+    // Tickets become available in "View ticket" once an admin approves the registration.
     return NextResponse.json({ registrationId }, { status: 201 });
   } catch (err) {
     console.error("Failed to save registration", err);

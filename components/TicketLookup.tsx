@@ -78,7 +78,7 @@ export default function TicketLookup() {
             </p>
             <p>
               Hi {found.name.split(" ")[0]}, registration {found.registrationId} is being reviewed by the HUHC team. Once
-              it&apos;s approved, your ticket will be emailed to your college email and will show up here.
+              it&apos;s approved, your ticket will show up here. Please check back later.
             </p>
           </div>
         ) : (

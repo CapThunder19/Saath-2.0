@@ -9,7 +9,7 @@ export default function VerificationPending({ registrationId }: { registrationId
         <p>
           Registration <strong className="reg-id-inline">{registrationId}</strong> is being reviewed by the HUHC team.
         </p>
-        <p>Once it&apos;s approved, your ticket will be emailed to your college email, and you can open it here too.</p>
+        <p>Once it&apos;s approved, your ticket will show up in <strong>View ticket</strong>. Please check back later.</p>
         <Link href="/" className="btn btn-outline" style={{ marginTop: 20 }}>
           Back to home
         </Link>

@@ -4,9 +4,8 @@ import type { Member } from "@/lib/registration";
 
 /**
  * With GOOGLE_SCRIPT_URL and GOOGLE_SCRIPT_SECRET set, registrations live in the Google
- * Sheet, photos in Drive, and approval emails go out from the sheet owner's Gmail
- * (see google-apps-script/Code.gs). Without them (local development), everything is
- * saved under ./data and emails are only logged to the console.
+ * Sheet and photos in Drive (see google-apps-script/Code.gs). Without them (local
+ * development), everything is saved under ./data instead.
  */
 
 export type Photo = { bytes: Buffer; ext: string; mimeType: string };
@@ -26,7 +25,6 @@ export type AdminRegistration = {
   approvedAt: string;
   members: (Member & { memberNo: number })[];
 };
-export type Email = { to: string; subject: string; html: string };
 
 export function saveRegistration(reg: NewRegistration): Promise<SaveResult> {
   const google = googleConfig();
@@ -89,10 +87,10 @@ export async function listRegistrations(): Promise<AdminRegistration[]> {
   return regs.reverse();
 }
 
-/** Marks a registration approved and sends each member their ticket email. */
-export async function approveRegistration(registrationId: string, emails: Email[]): Promise<{ approvedAt: string } | null> {
+/** Marks a registration approved, so its members can open their tickets. */
+export async function approveRegistration(registrationId: string): Promise<{ approvedAt: string } | null> {
   const google = googleConfig();
-  if (google) return callGoogle(google, { action: "approve", registrationId, emails });
+  if (google) return callGoogle(google, { action: "approve", registrationId });
 
   const regs = await readLocal();
   const r = regs.find((x) => x.registrationId === registrationId);
@@ -100,7 +98,6 @@ export async function approveRegistration(registrationId: string, emails: Email[
   r.status = "Approved";
   r.approvedAt = new Date().toISOString();
   await fs.writeFile(DATA_FILE, JSON.stringify(regs, null, 2));
-  for (const e of emails) console.log(`[dev] Would email ${e.to}: ${e.subject}`);
   return { approvedAt: r.approvedAt };
 }
 

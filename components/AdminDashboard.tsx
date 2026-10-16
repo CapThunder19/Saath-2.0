@@ -40,9 +40,7 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
   }, [regs, filter, query]);
 
   async function approve(reg: Reg) {
-    const resend = reg.status === "Approved";
-    const who = reg.members.map((m) => m.email).join(", ");
-    if (!confirm(`${resend ? "Resend" : "Approve and send"} ticket email${reg.members.length > 1 ? "s" : ""} to ${who}?`)) return;
+    if (!confirm(`Approve ${reg.registrationId} (${reg.members.map((m) => m.name).join(", ")})?`)) return;
     setBusy(reg.registrationId);
     setNotice(null);
     try {
@@ -51,17 +49,20 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ registrationId: reg.registrationId }),
       });
-      const json = await res.json();
       if (res.status === 401) return router.replace("/ticket");
-      if (!res.ok) throw new Error(json.error || "Something went wrong.");
+      // A timeout can return an HTML error page instead of JSON.
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Could not approve. Please try again.");
       setRegs((all) =>
         all.map((r) => (r.registrationId === reg.registrationId ? { ...r, status: "Approved", approvedAt: json.approvedAt } : r)),
       );
-      setNotice({ kind: "ok", text: `${reg.registrationId} approved · ${json.emailed} email${json.emailed === 1 ? "" : "s"} sent.` });
+      setNotice({ kind: "ok", text: `${reg.registrationId} approved. Members can now open their tickets from View ticket.` });
     } catch (err) {
       setNotice({ kind: "error", text: err instanceof Error ? err.message : "Something went wrong." });
     } finally {
       setBusy(null);
+      // Re-read the sheet so the list always shows what's really saved.
+      router.refresh();
     }
   }
 
@@ -141,13 +142,13 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
             </div>
 
             <footer>
-              <button className="btn btn-primary" disabled={busy === r.registrationId} onClick={() => approve(r)}>
-                {busy === r.registrationId
-                  ? "Sending..."
-                  : r.status === "Approved"
-                    ? "Resend ticket email"
-                    : `Approve & email ticket${r.members.length > 1 ? "s" : ""}`}
-              </button>
+              {r.status === "Approved" ? (
+                <span className="admin-approved-note">✓ Approved: tickets are live in View ticket</span>
+              ) : (
+                <button className="btn btn-primary" disabled={busy === r.registrationId} onClick={() => approve(r)}>
+                  {busy === r.registrationId ? "Approving..." : "Approve"}
+                </button>
+              )}
             </footer>
           </article>
         ))}

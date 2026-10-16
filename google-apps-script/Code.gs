@@ -1,5 +1,5 @@
 /**
- * Saath 2.0 registrations → Google Sheet + Drive, plus approval emails.
+ * Saath 2.0 registrations → Google Sheet + Drive, with admin approval.
  *
  * Paste this into the Apps Script editor of your registrations Google Sheet
  * (Extensions → Apps Script), set SECRET below, save, then publish it:
@@ -39,7 +39,7 @@ function doPost(e) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000); // one write at a time, so duplicate checks are reliable
   try {
-    if (body.action === "approve") return json({ ok: true, result: approve(body.registrationId, body.emails) });
+    if (body.action === "approve") return json({ ok: true, result: approve(body.registrationId) });
     return register(body);
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -133,20 +133,17 @@ function list() {
   return order.map((id) => byId[id]);
 }
 
-// Marks every row of the registration approved, then sends the ticket emails.
-function approve(registrationId, emails) {
+// Marks every row of the registration approved.
+function approve(registrationId) {
   const sheet = getSheet();
-  const rows = dataRows();
   const approvedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
   let found = false;
-  rows.forEach((r, i) => {
+  dataRows().forEach((r, i) => {
     if (r[COL.id] !== registrationId) return;
     found = true;
     sheet.getRange(i + 2, COL.status + 1, 1, 2).setValues([["Approved", approvedAt]]);
   });
-  if (!found) return null;
-  (emails || []).forEach((m) => MailApp.sendEmail({ to: m.to, subject: m.subject, htmlBody: m.html, name: "Saath 2.0 · HUHC" }));
-  return { approvedAt };
+  return found ? { approvedAt } : null;
 }
 
 function getSheet() {
@@ -182,9 +179,8 @@ function json(obj) {
 }
 
 // Run this once from the editor (select "setup" → Run) to grant permissions
-// (including sending email) and create the sheet tab and Drive folder.
+// and create the sheet tab and Drive folder.
 function setup() {
   getSheet();
   getFolder();
-  MailApp.getRemainingDailyQuota(); // asks for the email permission now, not on first approval
 }

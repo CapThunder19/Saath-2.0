@@ -990,3 +990,5 @@ body > main, .site-footer { position: relative; z-index: 1; }
   .admin-search { max-width: none; }
 }
 .programme-day .programme-highlight { margin-top: 16px; padding: 12px 14px; border: 1px solid #e5b56f66; border-radius: 10px; background: #f3ca8214; color: var(--text); font-size: .88rem; }
+
+.admin-approved-note { color: #86efac; font-size: .85rem; font-weight: 600; padding: 10px 0; }
