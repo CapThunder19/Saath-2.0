@@ -21,6 +21,7 @@ export default function RegisterPage() {
                   {t.size} {t.size === 1 ? "member" : "members"}
                 </span>
                 <span className="team-blurb">{t.blurb}</span>
+                <span className="team-fee">₹{t.fee}</span>
                 <span className="team-cta">Continue <span aria-hidden="true">→</span></span>
               </Link>
             ))}

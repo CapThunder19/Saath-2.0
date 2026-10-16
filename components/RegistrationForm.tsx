@@ -11,11 +11,13 @@ import {
   ORG_NAME,
   PHOTO_PICK_MAX_BYTES,
   PHOTO_TYPES,
+  UPI,
   emptyMember,
   getTeamType,
   hasErrors,
   validatePhoto,
   validateTeam,
+  validateTxnId,
   type Member,
   type MemberErrors,
   type TeamType,
@@ -29,6 +31,9 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
   const [regId, setRegId] = useState("");
+  const [step, setStep] = useState<"details" | "payment">("details");
+  const [txnId, setTxnId] = useState("");
+  const [txnError, setTxnError] = useState("");
 
   function clearError(i: number, key: keyof MemberErrors) {
     setErrors((all) => all.map((e, j) => (j === i && e[key] ? { ...e, [key]: undefined } : e)));
@@ -46,7 +51,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
     setErrors((all) => all.map((e, j) => (j === i ? { ...e, photo: file ? pickError ?? validatePhoto(file) : undefined } : e)));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function goToPayment(e: React.FormEvent) {
     e.preventDefault();
     const found = validateTeam(members);
     photos.forEach((p, i) => {
@@ -55,9 +60,20 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
     });
     setErrors(found);
     if (hasErrors(found)) return focusFirstError(found);
+    setServerError("");
+    setStep("payment");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const err = validateTxnId(txnId);
+    setTxnError(err ?? "");
+    if (err) return document.getElementById("txn-id")?.focus();
 
     const body = new FormData();
     body.append("teamType", team.id);
+    body.append("txnId", txnId);
     members.forEach((m, i) => {
       for (const [k, v] of Object.entries(m)) body.append(`m${i}_${k}`, v);
       body.append(`m${i}_photo`, photos[i]!);
@@ -69,9 +85,12 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
       const res = await fetch("/api/register", { method: "POST", body });
       const json = await res.json();
       if (!res.ok) {
-        if (Array.isArray(json.errors)) {
+        if (json.txnError) setTxnError(json.txnError);
+        // Problems with member details send the student back to that step.
+        if (Array.isArray(json.errors) && hasErrors(json.errors)) {
           setErrors(json.errors);
-          focusFirstError(json.errors);
+          setStep("details");
+          setTimeout(() => focusFirstError(json.errors));
         }
         throw new Error(json.error || "Something went wrong.");
       }
@@ -94,13 +113,80 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
             Registration ID <strong className="reg-id-inline">{regId}</strong>
           </p>
           <p>
-            You can view your ticket in the <strong>View ticket</strong> section using your admission number and name.
+            Your payment will be verified by the HUHC team. After that, you can view your ticket in the{" "}
+            <strong>View ticket</strong> section using your admission number and name.
           </p>
           <div className="tickets-actions">
             <Link href="/ticket" className="btn btn-primary">View ticket</Link>
             <Link href="/" className="btn btn-outline">Back to home</Link>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (step === "payment") {
+    const upiLink = `upi://pay?pa=${UPI.id}&pn=${encodeURIComponent(UPI.name)}&am=${team.fee}&cu=INR&tn=${encodeURIComponent(`${EVENT.name} ${team.label}`)}`;
+    return (
+      <div className="form-wrapper">
+        <div className="form-header">
+          <button type="button" className="form-back" onClick={() => setStep("details")}>← Back to details</button>
+          <h1>Pay ₹{team.fee} to complete registration</h1>
+          <p>
+            {team.label} registration fee · {team.size === 1 ? "1 member" : `${team.size} members`}
+          </p>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="payment">
+            <div className="payment-qr">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={team.payQr} alt={`UPI QR code to pay ₹${team.fee} to ${UPI.name}`} />
+              <a className="btn btn-primary payment-app-btn" href={upiLink}>Pay ₹{team.fee} with UPI app</a>
+            </div>
+            <ol className="payment-steps">
+              <li>
+                <strong>Scan the QR code</strong> with any UPI app (GPay, PhonePe, Paytm…) and pay exactly{" "}
+                <strong>₹{team.fee}</strong>. On a phone, tap <em>Pay with UPI app</em> instead.
+              </li>
+              <li>
+                Or pay to UPI ID <strong className="payment-upi">{UPI.id}</strong> ({UPI.name}).
+              </li>
+              <li>
+                After paying, copy the <strong>UPI transaction ID (UTR)</strong> from your payment app and paste it below.
+              </li>
+            </ol>
+          </div>
+
+          <div className={`field${txnError ? " invalid" : ""}`}>
+            <label htmlFor="txn-id">
+              UPI transaction ID (UTR) <span className="req">*</span>
+            </label>
+            <input
+              id="txn-id"
+              name="txnId"
+              value={txnId}
+              onChange={(e) => {
+                setTxnId(e.target.value);
+                setTxnError("");
+              }}
+              autoCapitalize="characters"
+              autoComplete="off"
+              inputMode="text"
+              placeholder="e.g. 428917365012"
+            />
+            {txnError && <span className="error-msg">{txnError}</span>}
+          </div>
+
+          {serverError && serverError !== txnError && <p className="server-error">{serverError}</p>}
+
+          <div className="form-nav">
+            <button type="button" className="btn btn-outline" onClick={() => setStep("details")}>← Back</button>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? "Submitting..." : "Submit registration"}
+            </button>
+          </div>
+        </form>
       </div>
     );
   }
@@ -118,7 +204,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
         </p>
       </div>
 
-      <form noValidate onSubmit={handleSubmit}>
+      <form noValidate onSubmit={goToPayment}>
         {members.map((m, i) => (
           <MemberFields
             key={i}
@@ -137,8 +223,8 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
         {serverError && <p className="server-error">{serverError}</p>}
 
         <div className="form-nav form-nav-end">
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? "Submitting..." : team.size === 1 ? "Submit registration" : "Register team"}
+          <button type="submit" className="btn btn-primary">
+            Continue to payment (₹{team.fee}) →
           </button>
         </div>
       </form>

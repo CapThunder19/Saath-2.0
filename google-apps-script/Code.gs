@@ -16,11 +16,13 @@ const FOLDER_NAME = "Saath 2.0 – Member Photos";
 const HEADERS = [
   "Registration ID", "Submitted at", "Team type", "Member", "Name", "Admission no.",
   "Mobile", "Course", "Branch", "College email", "Photo", "Status", "Approved at",
+  "Amount", "Transaction ID",
 ];
 // Columns (0-based) in each data row.
 const COL = {
   id: 0, submittedAt: 1, teamType: 2, member: 3, name: 4, admission: 5, phone: 6,
   course: 7, branch: 8, email: 9, photo: 10, status: 11, approvedAt: 12,
+  amount: 13, txnId: 14,
 };
 
 function doPost(e) {
@@ -50,11 +52,14 @@ function doPost(e) {
 
 function register(body) {
   const sheet = getSheet();
-  const taken = new Set(dataRows().map((r) => r[COL.admission].trim().toUpperCase()));
+  const rowsNow = dataRows();
+  const taken = new Set(rowsNow.map((r) => r[COL.admission].trim().toUpperCase()));
   const duplicates = body.members
     .map((m, i) => (taken.has(m.admissionNo.toUpperCase()) ? i : -1))
     .filter((i) => i >= 0);
   if (duplicates.length) return json({ ok: false, duplicates });
+  // One payment can only be used for one registration.
+  if (rowsNow.some((r) => r[COL.txnId].trim().toUpperCase() === body.txnId)) return json({ ok: false, duplicateTxn: true });
 
   const folder = getFolder();
   const submittedAt = new Date();
@@ -68,6 +73,7 @@ function register(body) {
     return [
       body.registrationId, submittedAt, body.teamType, `${i + 1} of ${body.members.length}`,
       m.name, m.admissionNo, m.phone, m.course, m.branch, m.email, file.getUrl(), "Pending", "",
+      body.amount, body.txnId,
     ];
   });
 
@@ -121,7 +127,7 @@ function list() {
     if (!byId[id]) {
       byId[id] = {
         registrationId: id, submittedAt: r[COL.submittedAt], teamType: r[COL.teamType],
-        status: statusOf(r), approvedAt: r[COL.approvedAt], members: [],
+        status: statusOf(r), approvedAt: r[COL.approvedAt], amount: r[COL.amount], txnId: r[COL.txnId], members: [],
       };
       order.push(id);
     }

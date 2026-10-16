@@ -37,11 +37,23 @@ export const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 // Largest original a student can pick before it gets shrunk.
 export const PHOTO_PICK_MAX_BYTES = 15 * 1024 * 1024;
 
+// Registration fee per team size, and the UPI QR code (in public/pay) for that amount.
 export const TEAM_TYPES = [
-  { id: "solo", label: "Solo", size: 1, icon: "👤", blurb: "Register on your own." },
-  { id: "duo", label: "Duo", size: 2, icon: "👥", blurb: "Register as a team of two." },
-  { id: "triplet", label: "Triplet", size: 3, icon: "👤👤👤", blurb: "Register as a team of three." },
+  { id: "solo", label: "Solo", size: 1, icon: "👤", blurb: "Register on your own.", fee: 20, payQr: "/pay/upi-solo-20.jpg" },
+  { id: "duo", label: "Duo", size: 2, icon: "👥", blurb: "Register as a team of two.", fee: 30, payQr: "/pay/upi-duo-30.jpg" },
+  { id: "triplet", label: "Triplet", size: 3, icon: "👤👤👤", blurb: "Register as a team of three.", fee: 40, payQr: "/pay/upi-triplet-40.jpg" },
 ] as const;
+
+// Where registration fees are paid (shown on the payment step).
+export const UPI = { id: "vs0252464@oksbi", name: "Vishal Singh" };
+
+// UPI transaction IDs (UTR) are usually 12 digits; some apps show longer letter-and-number IDs.
+export const normalizeTxnId = (s: string) => s.replace(/\s+/g, "").toUpperCase();
+export function validateTxnId(s: string): string | undefined {
+  if (!/^[A-Z0-9]{8,35}$/.test(normalizeTxnId(s))) {
+    return "Enter the UPI transaction ID (UTR) from your payment app, usually a 12-digit number.";
+  }
+}
 
 export type TeamType = (typeof TEAM_TYPES)[number]["id"];
 

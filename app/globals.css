@@ -1006,3 +1006,24 @@ body > main, .site-footer { position: relative; z-index: 1; }
 .ticket-verified, .ticket-unverified { display: inline-block; margin-bottom: 12px; padding: 6px 14px; border-radius: 99px; font-size: .8rem; font-weight: 700; }
 .ticket-verified { background: #1f6f4a; color: #dcfce7; }
 .ticket-unverified { background: var(--badge-bg); color: var(--badge-text); }
+
+/* Payment step */
+.form-header button.form-back { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.payment { display: grid; grid-template-columns: 260px 1fr; gap: 28px; align-items: start; margin-bottom: 24px; }
+.payment-qr { display: flex; flex-direction: column; gap: 12px; }
+.payment-qr img { width: 100%; border-radius: 14px; border: 1px solid var(--line); background: #fff; }
+.payment-app-btn { display: none; }
+.payment-steps { display: grid; gap: 14px; padding-left: 20px; color: var(--muted); font-size: .92rem; }
+.payment-steps strong { color: var(--text); }
+.payment-upi { color: var(--primary) !important; word-break: break-all; }
+.team-fee { margin-top: 10px; font: 400 1.5rem Georgia, serif; color: var(--text); }
+.admin-payment { display: flex; flex-wrap: wrap; gap: 6px 24px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--primary-soft); font-size: .82rem; color: var(--muted); }
+.admin-payment strong { color: var(--primary); letter-spacing: .5px; }
+@media (max-width: 680px) {
+  .payment { grid-template-columns: 1fr; }
+  .payment-qr { max-width: 280px; margin: 0 auto; width: 100%; }
+}
+/* Phones can't scan their own screen, so offer the UPI app link there. */
+@media (hover: none) and (pointer: coarse) {
+  .payment-app-btn { display: inline-flex; }
+}

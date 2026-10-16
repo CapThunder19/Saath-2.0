@@ -9,11 +9,19 @@ import type { Member } from "@/lib/registration";
  */
 
 export type Photo = { bytes: Buffer; ext: string; mimeType: string };
-export type NewRegistration = { registrationId: string; teamType: string; members: Member[]; photos: Photo[] };
+export type NewRegistration = {
+  registrationId: string;
+  teamType: string;
+  amount: number;
+  txnId: string;
+  members: Member[];
+  photos: Photo[];
+};
 export type Status = "Pending" | "Approved";
 
-// ok, or the indexes of members whose admission number is already registered.
-export type SaveResult = { ok: true } | { ok: false; duplicates: number[] };
+// ok, or the indexes of members whose admission number is already registered,
+// or duplicateTxn when the payment's transaction ID was already used.
+export type SaveResult = { ok: true } | { ok: false; duplicates: number[]; duplicateTxn?: boolean };
 
 export type FoundMember = { registrationId: string; memberNo: number; teamSize: number; name: string; status: Status };
 export type TicketData = { name: string; branch: string; teamSize: number; status: Status; photo: string /* data URL */ };
@@ -23,6 +31,8 @@ export type AdminRegistration = {
   teamType: string;
   status: Status;
   approvedAt: string;
+  amount: string;
+  txnId: string;
   members: (Member & { memberNo: number })[];
 };
 
@@ -32,6 +42,8 @@ export function saveRegistration(reg: NewRegistration): Promise<SaveResult> {
   return callGoogle<SaveResult>(google, {
     registrationId: reg.registrationId,
     teamType: reg.teamType,
+    amount: reg.amount,
+    txnId: reg.txnId,
     members: reg.members.map((m, i) => ({
       ...m,
       photo: { data: reg.photos[i].bytes.toString("base64"), ext: reg.photos[i].ext, mimeType: reg.photos[i].mimeType },
@@ -82,6 +94,8 @@ export async function listRegistrations(): Promise<AdminRegistration[]> {
         teamType: r.teamType,
         status: statusOf(r),
         approvedAt: r.approvedAt ?? "",
+        amount: String(r.amount ?? ""),
+        txnId: r.txnId ?? "",
         members: r.members.map(({ photo: _photo, ...m }, i) => ({ ...m, memberNo: i + 1 })),
       }));
   return regs.reverse();
@@ -122,13 +136,14 @@ async function callGoogle<T>({ url, secret }: { url: string; secret: string }, p
     body: JSON.stringify({ secret, ...payload }),
   });
   const text = await res.text();
-  let json: { ok?: boolean; result?: T; duplicates?: number[]; error?: string };
+  let json: { ok?: boolean; result?: T; duplicates?: number[]; duplicateTxn?: boolean; error?: string };
   try {
     json = JSON.parse(text);
   } catch {
     throw new Error(`Google Apps Script returned non-JSON (status ${res.status}): ${text.slice(0, 200)}`);
   }
   if (json.duplicates) return { ok: false, duplicates: json.duplicates } as T;
+  if (json.duplicateTxn) return { ok: false, duplicates: [], duplicateTxn: true } as T;
   if (!json.ok) {
     // An old deployment doesn't know the newer actions and fails reading `members`.
     if (json.error?.includes("reading 'map'")) {
@@ -147,7 +162,9 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "registrations.json");
 const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
 
-type StoredRegistration = Omit<NewRegistration, "photos" | "members"> & {
+type StoredRegistration = Omit<NewRegistration, "photos" | "members" | "amount" | "txnId"> & {
+  amount?: number;
+  txnId?: string;
   submittedAt: string;
   status?: Status;
   approvedAt?: string;
@@ -171,6 +188,7 @@ async function saveLocally(reg: NewRegistration): Promise<SaveResult> {
   const taken = new Set(existing.flatMap((r) => (r.members ?? []).map((m) => m.admissionNo)));
   const duplicates = reg.members.map((m, i) => (taken.has(m.admissionNo) ? i : -1)).filter((i) => i >= 0);
   if (duplicates.length) return { ok: false, duplicates };
+  if (existing.some((r) => r.txnId === reg.txnId)) return { ok: false, duplicates: [], duplicateTxn: true };
 
   const members = [];
   for (let i = 0; i < reg.members.length; i++) {
@@ -181,6 +199,8 @@ async function saveLocally(reg: NewRegistration): Promise<SaveResult> {
   existing.push({
     registrationId: reg.registrationId,
     teamType: reg.teamType,
+    amount: reg.amount,
+    txnId: reg.txnId,
     submittedAt: new Date().toISOString(),
     status: "Pending",
     members,

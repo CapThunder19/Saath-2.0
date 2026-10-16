@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
-import { emptyMember, getTeamType, hasErrors, validatePhoto, validateTeam, type Member } from "@/lib/registration";
+import {
+  emptyMember,
+  getTeamType,
+  hasErrors,
+  normalizeTxnId,
+  validatePhoto,
+  validateTeam,
+  validateTxnId,
+  type Member,
+} from "@/lib/registration";
 import { saveRegistration, type Photo } from "@/lib/storage";
 
 // Apps Script can take a few seconds to save photos to Drive.
@@ -13,8 +22,8 @@ function imageType(buf: Buffer): { ext: string; mimeType: string } | null {
   return null;
 }
 
-const invalid = (errors: object[], error = "Please correct the highlighted fields.", status = 422) =>
-  NextResponse.json({ error, errors }, { status });
+const invalid = (errors: object[], error = "Please correct the highlighted fields.", status = 422, txnError?: string) =>
+  NextResponse.json({ error, errors, txnError }, { status });
 
 export async function POST(req: Request) {
   let form: FormData;
@@ -58,9 +67,17 @@ export async function POST(req: Request) {
   }
   if (hasErrors(errors)) return invalid(errors);
 
+  const txnId = normalizeTxnId(String(form.get("txnId") ?? ""));
+  const txnError = validateTxnId(txnId);
+  if (txnError) return invalid(errors, txnError, 422, txnError);
+
   const registrationId = "SAATH-" + Date.now().toString(36).toUpperCase().slice(-6);
   try {
-    const result = await saveRegistration({ registrationId, teamType: team.id, members, photos });
+    const result = await saveRegistration({ registrationId, teamType: team.id, amount: team.fee, txnId, members, photos });
+    if (!result.ok && result.duplicateTxn) {
+      const msg = "This transaction ID has already been used for another registration.";
+      return invalid(errors, msg, 409, msg);
+    }
     if (!result.ok) {
       // Each student can only be registered once, in any team.
       for (const i of result.duplicates) errors[i].admissionNo = "This admission number is already registered.";

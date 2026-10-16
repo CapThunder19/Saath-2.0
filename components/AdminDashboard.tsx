@@ -35,12 +35,14 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
         (filter === "All" || r.status === filter) &&
         (!q ||
           r.registrationId.toLowerCase().includes(q) ||
+          r.txnId.toLowerCase().includes(q) ||
           r.members.some((m) => [m.name, m.admissionNo, m.email, m.phone].some((v) => v.toLowerCase().includes(q)))),
     );
   }, [regs, filter, query]);
 
   async function approve(reg: Reg) {
-    if (!confirm(`Approve ${reg.registrationId} (${reg.members.map((m) => m.name).join(", ")})?`)) return;
+    const paid = reg.txnId ? `\n\nCheck that ₹${reg.amount} with UPI transaction ID ${reg.txnId} arrived before approving.` : "";
+    if (!confirm(`Approve ${reg.registrationId} (${reg.members.map((m) => m.name).join(", ")})?${paid}`)) return;
     setBusy(reg.registrationId);
     setNotice(null);
     try {
@@ -101,7 +103,7 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
         <input
           className="admin-search"
           type="search"
-          placeholder="Search name, admission no., email, phone or ID"
+          placeholder="Search name, admission no., email, phone, ID or txn ID"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -123,6 +125,13 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
                 {r.status === "Approved" ? `Approved ${r.approvedAt ? formatDate(r.approvedAt) : ""}` : "Pending"}
               </span>
             </header>
+
+            <div className="admin-payment">
+              <span>Paid {r.amount ? `₹${r.amount}` : "—"}</span>
+              <span>
+                UPI txn ID <strong>{r.txnId || "not given"}</strong>
+              </span>
+            </div>
 
             <div className="admin-members">
               {r.members.map((m, i) => (
