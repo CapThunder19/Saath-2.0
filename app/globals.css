@@ -992,3 +992,17 @@ body > main, .site-footer { position: relative; z-index: 1; }
 .programme-day .programme-highlight { margin-top: 16px; padding: 12px 14px; border: 1px solid #e5b56f66; border-radius: 10px; background: #f3ca8214; color: var(--text); font-size: .88rem; }
 
 .admin-approved-note { color: #86efac; font-size: .85rem; font-weight: 600; padding: 10px 0; }
+
+/* Ticket watermarks and verification QR. */
+.ticket-watermark { position: absolute; inset: 0; z-index: 2; pointer-events: none; background-repeat: repeat; }
+.ticket-photo { position: relative; overflow: hidden; width: 156px; height: 194px; }
+.ticket-photo-mark { position: absolute; inset: 5px; border-radius: 11px; background-repeat: repeat; pointer-events: none; display: flex; align-items: flex-end; justify-content: center; }
+.ticket-photo-mark span { margin-bottom: 8px; padding: 2px 8px; border-radius: 99px; background: #4a0f1ecc; color: #f4b740; font: 700 9px Arial, Helvetica, sans-serif; letter-spacing: 1.5px; }
+.ticket-stub { gap: 0; }
+.ticket-id { margin-top: 10px; }
+.ticket-qr { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 10px; }
+.ticket-qr img { width: 84px; height: 84px; border-radius: 6px; border: 2px solid var(--gold); background: var(--cream); }
+.ticket-qr span { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--rose); }
+.ticket-verified, .ticket-unverified { display: inline-block; margin-bottom: 12px; padding: 6px 14px; border-radius: 99px; font-size: .8rem; font-weight: 700; }
+.ticket-verified { background: #1f6f4a; color: #dcfce7; }
+.ticket-unverified { background: var(--badge-bg); color: var(--badge-text); }

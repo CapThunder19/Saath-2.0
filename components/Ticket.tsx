@@ -15,20 +15,39 @@ export type TicketProps = {
   registrationId: string;
   memberNo: number;
   teamSize: number;
+  qr?: string; // data URL of the "scan to verify" QR code
 };
+
+// Repeating diagonal text, as an SVG background tile. Fonts inside an SVG image
+// can't use web fonts, so it sticks to Arial.
+function watermark(text: string, { w, h, size, fill, opacity, angle }: { w: number; h: number; size: number; fill: string; opacity: number; angle: number }) {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">` +
+    `<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" transform="rotate(${angle} ${w / 2} ${h / 2})" ` +
+    `font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="${size}" letter-spacing="2" fill="${fill}" fill-opacity="${opacity}" ` +
+    `stroke="#000" stroke-opacity="${opacity / 2}" stroke-width="0.6">${text}</text></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+const TICKET_MARK = watermark("HUHC · SAATH 2.0", { w: 300, h: 130, size: 18, fill: "#f4b740", opacity: 0.08, angle: -22 });
 
 // The ticket is laid out at a fixed 1000px width so the downloaded PNG always
 // looks the same; on screen it's scaled down to fit its container.
 const TICKET_WIDTH = 1000;
 
 export const Ticket = forwardRef<HTMLDivElement, TicketProps>(function Ticket(
-  { name, branch, photo, registrationId, memberNo, teamSize },
+  { name, branch, photo, registrationId, memberNo, teamSize, qr },
   ref,
 ) {
+  // The photo's watermark carries this ticket's ID, so a swapped-in photo
+  // would need the watermark faked as well.
+  const photoMark = watermark(`HUHC · ${registrationId}`, { w: 170, h: 70, size: 11, fill: "#ffffff", opacity: 0.6, angle: -28 });
+
   return (
     <div ref={ref} className={`ticket-frame ${body.className}`}>
       <div className="ticket">
         <Rangoli />
+        <div className="ticket-watermark" style={{ backgroundImage: TICKET_MARK }} aria-hidden="true" />
         <div className="ticket-inner">
           <div className="ticket-main">
             <div className="ticket-top">
@@ -61,11 +80,21 @@ export const Ticket = forwardRef<HTMLDivElement, TicketProps>(function Ticket(
             <div className="ticket-photo">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photo} alt={`Photo of ${name}`} />
+              <div className="ticket-photo-mark" style={{ backgroundImage: photoMark }} aria-hidden="true">
+                <span>SAATH 2.0 · HUHC</span>
+              </div>
             </div>
             <p className="ticket-id">
               {registrationId}
               {teamSize > 1 && <span> · {memberNo} of {teamSize}</span>}
             </p>
+            {qr && (
+              <div className="ticket-qr">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qr} alt="QR code to verify this ticket" />
+                <span>Scan to verify</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

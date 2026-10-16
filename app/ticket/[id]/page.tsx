@@ -47,6 +47,7 @@ export default async function TicketPage({ params, searchParams }: Props) {
             registrationId={parsed.registrationId}
             memberNo={parsed.memberNo}
             teamSize={ticket.teamSize}
+            approved={ticket.status === "Approved"}
           />
         ) : (
           <div className="form-wrapper">
