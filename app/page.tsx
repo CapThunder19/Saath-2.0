@@ -6,7 +6,6 @@ import { EVENT } from "@/lib/registration";
 const eventDetails = [
   { label: "When", value: EVENT.date, note: EVENT.time },
   { label: "Where", value: EVENT.venue, note: "A little closer to making a difference" },
-  { label: "Entry", value: EVENT.entry, note: "Bring your time. Bring your heart." },
 ];
 
 export default function Home() {
@@ -19,8 +18,9 @@ export default function Home() {
             <span className="registration-pill"><span aria-hidden="true" /> Registrations open</span>
             <h1>Saath<span className="edition">2.0</span><span className="hero-flower" aria-hidden="true">✳</span></h1>
             <p className="hero-subtitle">{EVENT.tagline}.</p>
-            <p className="hero-description">A little time. A little care.<br />A whole lot of difference, <em>together.</em></p>
-            <p className="hero-support">Join our artwork collection and drawing competition this Diwali. Create, contribute and celebrate with us on 26–27 October 2026.</p>
+            <p className="hero-description">Be a part of SAATH 2.0 – Ek Chota Sa Prayaas <em>this Diwali!</em></p>
+            <p className="hero-support">Unleash your creativity, contribute your artwork, and join us in spreading smiles to children in need. Let your art become a little act of kindness.</p>
+            <p className="hero-motto"><strong>Create. Contribute. Celebrate.</strong><span>26–27 October 2026 | HUHC Club</span></p>
             <div className="hero-actions">
               <Link href="/register" className="btn btn-primary">Be part of Saath <span aria-hidden="true">↗</span></Link>
               <a href="#event" className="text-link">Explore the event <span aria-hidden="true">↓</span></a>
@@ -30,7 +30,6 @@ export default function Home() {
           <figure className="hero-photo">
             <HeroSlideshow />
             <figcaption><span>Small efforts. Shared joy.</span><small>A glimpse of our first chapter</small></figcaption>
-            <div className="photo-stamp" aria-hidden="true">Made with<br /><strong>heart ♡</strong></div>
           </figure>
         </div>
       </section>
@@ -52,14 +51,14 @@ export default function Home() {
           <div className="programme-days">
             <article className="programme-day">
               <div className="day-date"><span>OCT</span><strong>26</strong><span>2026 · DAY 01</span></div>
-              <div><span className="eyebrow">Artwork & craft collection</span><h3>Share something you&apos;ve made.</h3><p>Submit your artwork and crafts at the College Amphitheatre between 4:30 PM and 6:00 PM. Your donated creations will become part of the final exhibition and sale on 27 October.</p><p className="programme-note">Bring your artwork and handmade crafts for submission.</p></div>
+              <div><span className="eyebrow">Artwork & craft collection</span><h3>Share something you&apos;ve made.</h3><p>Submit your artwork and crafts at the College Amphitheatre between 4:30 PM and 6:00 PM. Your donated creations will become part of the final exhibition and sale on 27 October.</p><p className="programme-highlight">The top 3 entries win prizes, and every participant gets a certificate.</p><p className="programme-note">Bring your artwork and handmade crafts for submission.</p></div>
             </article>
             <article className="programme-day">
               <div className="day-date"><span>OCT</span><strong>27</strong><span>2026 · DAY 02</span></div>
-              <div><span className="eyebrow">Final exhibition & sale</span><h3>Let creativity bring us together.</h3><p>Visit the College Amphitheatre between 4:30 PM and 6:00 PM for the final exhibition and sale of all donated items. Explore the artwork and crafts, celebrate the contributors, and purchase a creation to take home.</p><p className="programme-note">All donated items will be exhibited and offered for sale.</p></div>
+              <div><span className="eyebrow">Final exhibition & sale</span><h3>Let creativity bring us together.</h3><p>Visit the College Amphitheatre between 4:30 PM and 6:00 PM for the final exhibition and sale of all donated items. Explore the artwork and crafts, celebrate the contributors, and purchase a creation to take home.</p><p className="programme-highlight">Plus a celebration with singing, dancing and interactive games!</p><p className="programme-note">All donated items will be exhibited and offered for sale.</p></div>
             </article>
           </div>
-          <div className="competition-note"><div><h3>Drawing competition</h3><p>The drawing competition is part of this two-day event. Its exact schedule, theme, materials and participation rules will be announced by the organisers.</p></div><Link href="/register" className="btn btn-primary">Register for the event <span aria-hidden="true">↗</span></Link></div>
+          <div className="competition-note"><Link href="/register" className="btn btn-primary">Register for the event <span aria-hidden="true">↗</span></Link></div>
         </div>
       </section>
       <section className="story-section">

@@ -526,7 +526,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--primary); outli
 .hero-subtitle { font-family: Georgia, serif; font-style: italic; color: var(--primary); font-size: 1.7rem; margin-bottom: 26px; }
 .hero-description { font-size: clamp(1.25rem, 2vw, 1.6rem); line-height: 1.5; letter-spacing: -.5px; margin-bottom: 14px; }
 .hero-description em { font-family: Georgia, serif; }
-.hero-support { font-size: .94rem; color: var(--muted); max-width: 390px; margin-bottom: 28px; }
+.hero-support { font-size: .94rem; color: var(--muted); max-width: 440px; margin-bottom: 14px; }
+.hero-motto { display: flex; flex-direction: column; gap: 2px; margin-bottom: 28px; font-size: .9rem; }
+.hero-motto strong { color: var(--primary); letter-spacing: .3px; }
+.hero-motto span { color: var(--muted); font-size: .82rem; }
 .hero-actions { align-items: center; gap: 24px; }
 .text-link { font-size: .85rem; border-bottom: 1px solid var(--border); padding: 6px 0; }
 .text-link span { margin-left: 10px; }
@@ -537,10 +540,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--primary); outli
 .hero-photo figcaption { position: absolute; z-index: 1; bottom: 28px; left: 30px; color: white; }
 .hero-photo figcaption span { font-family: Georgia, serif; font-size: 1.7rem; }
 .hero-photo figcaption small { display: block; font-size: .7rem; margin-top: 6px; opacity: .8; letter-spacing: .5px; }
-.photo-stamp { position: absolute; right: -20px; bottom: 90px; z-index: 2; background: #e9b56d; color: #333f2f; width: 110px; height: 110px; display: flex; flex-direction: column; justify-content: center; text-align: center; border-radius: 50%; transform: rotate(12deg); font-size: .75rem; border: 5px solid var(--bg-alt); }
-.photo-stamp strong { font: italic 1.4rem Georgia, serif; }
 .event-info { padding: 34px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 82px; }
-.event-info-grid { display: grid; grid-template-columns: 1.3fr 1fr 1.1fr .9fr; gap: 26px; align-items: center; }
+.event-info-grid { display: grid; grid-template-columns: 1.3fr 1fr 1.1fr; gap: 26px; align-items: center; }
 .event-info-title .eyebrow { font-size: .58rem; letter-spacing: 1.2px; }
 .event-info-title h2 { font: 1.5rem/1.3 Georgia, serif; margin-top: 9px; }
 .event-info-item { border-left: 1px solid var(--line); padding-left: 26px; }
@@ -597,7 +598,6 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--primary); outli
   .event-intro h1 { font-size: 6.5rem; }
   .hero-photo { min-height: 470px; border-radius: 120px 120px 10px 10px; }
   .hero-photo img { object-position: center 65%; }
-  .photo-stamp { right: 15px; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: 20px; }
   .section-heading > p { max-width: 540px; }
   .benefit-row { gap: 24px; }
@@ -667,7 +667,6 @@ body > main, .site-footer { position: relative; z-index: 1; }
 .hero-flower { text-shadow: 0 0 30px #ffbc5550; }
 .registration-pill { background: #e2a7560c; border-color: #e5b56f66; color: #ffe1ad; }
 .registration-pill > span { background: #f7c76b; box-shadow: 0 0 10px #ffbd6b66; }
-.photo-stamp { background: #f3ca82; color: #50142c; border-color: #732d40; }
 .hero-photo { box-shadow: 0 16px 65px #16051040; outline: 1px solid #f3ca8240; }
 .hero-photo::after { background: linear-gradient(transparent, #2d081bd9); }
 .btn-primary { box-shadow: 0 4px 24px #e7a23f12; }
@@ -728,7 +727,7 @@ body > main, .site-footer { position: relative; z-index: 1; }
 .programme-day h3 { font: 1.5rem/1.25 Georgia, serif; margin: 12px 0; }
 .programme-day p, .competition-note p { font-size: .88rem; color: var(--muted); }
 .programme-day .programme-note { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--primary); font-size: .78rem; }
-.competition-note { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 26px 0; border-bottom: 1px solid var(--line); }
+.competition-note { display: flex; align-items: center; justify-content: flex-end; gap: 32px; padding: 26px 0; border-bottom: 1px solid var(--line); }
 .competition-note h3 { font-size: 1rem; margin-bottom: 8px; }
 .competition-note p { max-width: 650px; }
 .competition-note .btn { flex-shrink: 0; }
@@ -757,7 +756,6 @@ body > main, .site-footer { position: relative; z-index: 1; }
 .hero-photo { overflow: hidden; }
 .hero-photo > img { opacity: 0; transition: opacity 1.2s ease; }
 .hero-photo > img.is-active { opacity: 1; }
-.hero-photo .photo-stamp { right: 18px; }
 
 /* Gallery slider: big centre photo, smaller translucent neighbours. */
 .photo-carousel { margin-top: 8px; }
@@ -991,3 +989,4 @@ body > main, .site-footer { position: relative; z-index: 1; }
   .admin-members { grid-template-columns: 1fr; }
   .admin-search { max-width: none; }
 }
+.programme-day .programme-highlight { margin-top: 16px; padding: 12px 14px; border: 1px solid #e5b56f66; border-radius: 10px; background: #f3ca8214; color: var(--text); font-size: .88rem; }

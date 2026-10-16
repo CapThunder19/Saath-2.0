@@ -13,7 +13,7 @@ export const EVENT = {
   time: "4:30 PM – 6:00 PM",
   venue: "College Amphitheatre",
   entry: "Free",
-  activity: "Artwork Collection & Drawing Competition",
+  activity: "Diwali Exhibition and Celebration",
 };
 
 // What's printed on each member's entry ticket.

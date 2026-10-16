@@ -20,16 +20,14 @@ export default function Footer() {
               <h4>Quick links</h4>
               <ul>
                 <li><Link href="/#event">{EVENT.name}</Link></li>
-                <li><Link href="/#about">About us</Link></li>
                 <li><Link href="/register">Register</Link></li>
               </ul>
             </div>
             <div>
               <h4>Contact</h4>
               <ul>
-                <li>📧 contact@huhc.org</li>
-                <li>📞 +91 98765 43210</li>
-                <li>📍 New Delhi, India</li>
+                <li>📍 ABES, Ghaziabad, India</li>
+                <li>For any help, please approach the help desk.</li>
               </ul>
             </div>
           </div>
