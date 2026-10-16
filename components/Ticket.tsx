@@ -1,6 +1,7 @@
 "use client";
 
 import { Bricolage_Grotesque, DM_Sans } from "next/font/google";
+import { toPng } from "html-to-image";
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { EVENT, ORG_SHORT, TICKET } from "@/lib/registration";
 
@@ -71,6 +72,14 @@ export const Ticket = forwardRef<HTMLDivElement, TicketProps>(function Ticket(
     </div>
   );
 });
+
+export async function downloadTicketPng(node: HTMLElement, name: string) {
+  const url = await toPng(node, { pixelRatio: 2, cacheBust: true });
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Saath-2.0-ticket-${name.trim().replace(/\s+/g, "-")}.png`;
+  a.click();
+}
 
 // Scales a fixed-width ticket down to the available width.
 export function TicketScaler({ children }: { children: React.ReactNode }) {

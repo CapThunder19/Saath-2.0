@@ -32,7 +32,10 @@ export const BRANCHES = ["CSE", "CSE (AI & ML)", "CSE (Data Science)", "IT", "EC
 export const COLLEGE_EMAIL_DOMAIN = "abes.ac.in";
 
 export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+// What the server accepts per photo, after the browser has shrunk it (see compressPhoto).
 export const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+// Largest original a student can pick before it gets shrunk.
+export const PHOTO_PICK_MAX_BYTES = 15 * 1024 * 1024;
 
 export const TEAM_TYPES = [
   { id: "solo", label: "Solo", size: 1, icon: "👤", blurb: "Register on your own." },
@@ -98,8 +101,8 @@ export function validateTeam(members: Member[]): MemberErrors[] {
 
 export const hasErrors = (errors: MemberErrors[]) => errors.some((e) => Object.keys(e).length > 0);
 
-export function validatePhoto(file: { type: string; size: number } | null): string | undefined {
+export function validatePhoto(file: { type: string; size: number } | null, maxBytes = PHOTO_MAX_BYTES): string | undefined {
   if (!file || file.size === 0) return "Please upload a photo.";
   if (!PHOTO_TYPES.includes(file.type)) return "Photo must be a JPG, PNG or WebP image.";
-  if (file.size > PHOTO_MAX_BYTES) return "Photo must be 2 MB or smaller.";
+  if (file.size > maxBytes) return `Photo must be ${maxBytes / 1024 / 1024} MB or smaller.`;
 }

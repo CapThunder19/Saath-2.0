@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { toPng } from "html-to-image";
-import { Ticket, TicketScaler } from "@/components/Ticket";
+import { useEffect, useState } from "react";
+import { compressPhoto } from "@/lib/compressPhoto";
 import {
   BRANCHES,
   COLLEGE_EMAIL_DOMAIN,
   COURSES,
   EVENT,
   ORG_NAME,
+  PHOTO_PICK_MAX_BYTES,
   PHOTO_TYPES,
   emptyMember,
   getTeamType,
@@ -29,28 +29,6 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
   const [regId, setRegId] = useState("");
-  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
-  const [downloading, setDownloading] = useState(false);
-  const ticketRefs = useRef<(HTMLDivElement | null)[]>([]);
-
-  async function downloadTicket(i: number) {
-    const node = ticketRefs.current[i];
-    if (!node) return;
-    const url = await toPng(node, { pixelRatio: 2, cacheBust: true });
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Saath-2.0-ticket-${members[i].name.trim().replace(/\s+/g, "-")}.png`;
-    a.click();
-  }
-
-  async function downloadAll() {
-    setDownloading(true);
-    try {
-      for (let i = 0; i < members.length; i++) await downloadTicket(i);
-    } finally {
-      setDownloading(false);
-    }
-  }
 
   function clearError(i: number, key: keyof MemberErrors) {
     setErrors((all) => all.map((e, j) => (j === i && e[key] ? { ...e, [key]: undefined } : e)));
@@ -61,9 +39,11 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
     clearError(i, key);
   }
 
-  function setPhoto(i: number, file: File | null) {
+  async function setPhoto(i: number, picked: File | null) {
+    const pickError = picked ? validatePhoto(picked, PHOTO_PICK_MAX_BYTES) : undefined;
+    const file = picked && !pickError ? await compressPhoto(picked) : picked;
     setPhotos((all) => all.map((p, j) => (j === i ? file : p)));
-    setErrors((all) => all.map((e, j) => (j === i ? { ...e, photo: file ? validatePhoto(file) : undefined } : e)));
+    setErrors((all) => all.map((e, j) => (j === i ? { ...e, photo: file ? pickError ?? validatePhoto(file) : undefined } : e)));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -95,8 +75,6 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
         }
         throw new Error(json.error || "Something went wrong.");
       }
-      // Tickets embed the photos as data URLs so the downloaded PNGs include them.
-      setPhotoUrls(await Promise.all(photos.map((p) => readAsDataUrl(p!))));
       setRegId(json.registrationId);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -108,47 +86,21 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
 
   if (regId) {
     return (
-      <div className="tickets-page">
-        <div className="success tickets-intro">
+      <div className="form-wrapper">
+        <div className="success">
           <div className="check">✓</div>
-          <h2>{team.size === 1 ? `You're in, ${members[0].name.split(" ")[0]}!` : "Your team is registered!"}</h2>
+          <h2>Registration done!</h2>
           <p>
             Registration ID <strong className="reg-id-inline">{regId}</strong>
           </p>
           <p>
-            Download {team.size === 1 ? "your entry ticket" : `all ${team.size} entry tickets`} and show{" "}
-            {team.size === 1 ? "it" : "them"} at the entry. {team.size > 1 && "Each member needs their own ticket."}
+            You can view your ticket in the <strong>View ticket</strong> section using your admission number and name.
           </p>
           <div className="tickets-actions">
-            <button className="btn btn-primary" onClick={downloadAll} disabled={downloading}>
-              {downloading ? "Preparing..." : team.size === 1 ? "Download ticket" : `Download all ${team.size} tickets`}
-            </button>
+            <Link href="/ticket" className="btn btn-primary">View ticket</Link>
             <Link href="/" className="btn btn-outline">Back to home</Link>
           </div>
         </div>
-
-        {members.map((m, i) => (
-          <div className="ticket-card" key={i}>
-            <TicketScaler>
-              <Ticket
-                ref={(el) => {
-                  ticketRefs.current[i] = el;
-                }}
-                name={m.name}
-                branch={m.branch}
-                photo={photoUrls[i]}
-                registrationId={regId}
-                memberNo={i + 1}
-                teamSize={team.size}
-              />
-            </TicketScaler>
-            {team.size > 1 && (
-              <button className="text-link ticket-download" onClick={() => downloadTicket(i)}>
-                Download {m.name.split(" ")[0]}&apos;s ticket ↓
-              </button>
-            )}
-          </div>
-        ))}
       </div>
     );
   }
@@ -192,15 +144,6 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
       </form>
     </div>
   );
-}
-
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 function focusFirstError(errors: MemberErrors[]) {
@@ -278,7 +221,7 @@ function MemberFields({ index, title, member, photo, errors, onField, onPhoto }:
           {preview ? <img src={preview} alt="Selected photo" /> : <span className="photo-placeholder" aria-hidden="true">📷</span>}
           <span className="photo-text">
             <strong>{photo ? photo.name : "Upload photo"}</strong>
-            <small>{photo ? "Click to choose a different photo" : "JPG, PNG or WebP · up to 2 MB · a clear photo of the face"}</small>
+            <small>{photo ? "Click to choose a different photo" : "JPG, PNG or WebP · a clear photo of the face"}</small>
           </span>
         </label>
         {err("photo")}

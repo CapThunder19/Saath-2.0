@@ -12,7 +12,10 @@ export default function Header() {
           </span>
           <span className="logo-text">Saath<small>by HUHC</small></span>
         </Link>
-        <Link href="/register" className="btn btn-primary">Register now</Link>
+        <div className="nav-actions">
+          <Link href="/ticket" className="btn btn-outline">View ticket</Link>
+          <Link href="/register" className="btn btn-primary">Register now</Link>
+        </div>
       </nav>
     </header>
   );
