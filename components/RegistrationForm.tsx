@@ -126,7 +126,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
   }
 
   if (step === "payment") {
-    const upiLink = `upi://pay?pa=${UPI.id}&pn=${encodeURIComponent(UPI.name)}&am=${team.fee}&cu=INR&tn=${encodeURIComponent(`${EVENT.name} ${team.label}`)}`;
+    const upiLink = `upi://pay?pa=${UPI.id}&pn=${encodeURIComponent(UPI.label)}&am=${team.fee}&cu=INR&tn=${encodeURIComponent(`${EVENT.name} ${team.label}`)}`;
     return (
       <div className="form-wrapper">
         <div className="form-header">
@@ -141,7 +141,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
           <div className="payment">
             <div className="payment-qr">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={team.payQr} alt={`UPI QR code to pay ₹${team.fee} to ${UPI.name}`} />
+              <img src={team.payQr} alt={`UPI QR code to pay ₹${team.fee}`} />
               <a className="btn btn-primary payment-app-btn" href={upiLink}>Pay ₹{team.fee} with UPI app</a>
             </div>
             <ol className="payment-steps">
@@ -150,7 +150,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
                 <strong>₹{team.fee}</strong>. On a phone, tap <em>Pay with UPI app</em> instead.
               </li>
               <li>
-                Or pay to UPI ID <strong className="payment-upi">{UPI.id}</strong> ({UPI.name}).
+                Or pay to UPI ID <strong className="payment-upi">{UPI.id}</strong>.
               </li>
               <li>
                 After paying, copy the <strong>UPI transaction ID (UTR)</strong> from your payment app and paste it below.
