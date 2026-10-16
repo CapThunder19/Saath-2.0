@@ -40,7 +40,7 @@ export const PHOTO_PICK_MAX_BYTES = 15 * 1024 * 1024;
 export const TEAM_TYPES = [
   { id: "solo", label: "Solo", size: 1, icon: "👤", blurb: "Register on your own." },
   { id: "duo", label: "Duo", size: 2, icon: "👥", blurb: "Register as a team of two." },
-  { id: "triplet", label: "Triplet", size: 3, icon: "👨‍👩‍👦", blurb: "Register as a team of three." },
+  { id: "triplet", label: "Triplet", size: 3, icon: "👤👤👤", blurb: "Register as a team of three." },
 ] as const;
 
 export type TeamType = (typeof TEAM_TYPES)[number]["id"];
