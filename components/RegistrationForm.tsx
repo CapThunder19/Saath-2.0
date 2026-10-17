@@ -34,6 +34,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
   const [step, setStep] = useState<"details" | "payment">("details");
   const [txnId, setTxnId] = useState("");
   const [txnError, setTxnError] = useState("");
+  const [checking, setChecking] = useState(false);
 
   function clearError(i: number, key: keyof MemberErrors) {
     setErrors((all) => all.map((e, j) => (j === i && e[key] ? { ...e, [key]: undefined } : e)));
@@ -51,7 +52,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
     setErrors((all) => all.map((e, j) => (j === i ? { ...e, photo: file ? pickError ?? validatePhoto(file) : undefined } : e)));
   }
 
-  function goToPayment(e: React.FormEvent) {
+  async function goToPayment(e: React.FormEvent) {
     e.preventDefault();
     const found = validateTeam(members);
     photos.forEach((p, i) => {
@@ -60,7 +61,36 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
     });
     setErrors(found);
     if (hasErrors(found)) return focusFirstError(found);
+
+    // Make sure nobody in the team is already registered before anyone pays.
+    setChecking(true);
     setServerError("");
+    try {
+      const res = await fetch("/api/register/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admissionNos: members.map((m) => m.admissionNo) }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Could not check your details right now. Please try again.");
+      if (json.taken?.length) {
+        const withTaken = found.map((e, i) =>
+          json.taken.includes(i) ? { ...e, admissionNo: "This admission number is already registered." } : e,
+        );
+        setErrors(withTaken);
+        setServerError(
+          json.taken.length === 1 && team.size === 1
+            ? "This admission number is already registered. Check View ticket for your registration."
+            : "Some members are already registered. Check View ticket for their registration.",
+        );
+        return focusFirstError(withTaken);
+      }
+    } catch (err) {
+      return setServerError(err instanceof Error ? err.message : "Could not check your details right now. Please try again.");
+    } finally {
+      setChecking(false);
+    }
+
     setStep("payment");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -223,8 +253,8 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
         {serverError && <p className="server-error">{serverError}</p>}
 
         <div className="form-nav form-nav-end">
-          <button type="submit" className="btn btn-primary">
-            Continue to payment (₹{team.fee}) →
+          <button type="submit" className="btn btn-primary" disabled={checking}>
+            {checking ? "Checking..." : <>Continue to payment (₹{team.fee}) →</>}
           </button>
         </div>
       </form>
