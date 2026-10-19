@@ -41,7 +41,6 @@ export const PHOTO_PICK_MAX_BYTES = 15 * 1024 * 1024;
 export const TEAM_TYPES = [
   { id: "solo", label: "Solo", size: 1, icon: "👤", blurb: "Register on your own.", fee: 20, payQr: "/pay/upi-solo-20.jpg" },
   { id: "duo", label: "Duo", size: 2, icon: "👥", blurb: "Register as a team of two.", fee: 30, payQr: "/pay/upi-duo-30.jpg" },
-  { id: "triplet", label: "Triplet", size: 3, icon: "👤👤👤", blurb: "Register as a team of three.", fee: 40, payQr: "/pay/upi-triplet-40.jpg" },
 ] as const;
 
 // Where registration fees are paid (shown on the payment step).
@@ -97,7 +96,8 @@ export function validateMember(d: Member): MemberErrors {
   return e;
 }
 
-// Validates every member, plus checks that no two members share an admission number or email.
+// Validates every member, plus checks that the Duo partners don't share an admission number or email
+// (name, mobile, course and branch may be the same).
 export function validateTeam(members: Member[]): MemberErrors[] {
   const errors = members.map(validateMember);
   const seen = { admissionNo: new Set<string>(), email: new Set<string>() };
@@ -105,7 +105,7 @@ export function validateTeam(members: Member[]): MemberErrors[] {
     for (const key of ["admissionNo", "email"] as const) {
       const v = m[key].trim().toLowerCase();
       if (!v || errors[i][key]) continue;
-      if (seen[key].has(v)) errors[i][key] = `This ${key === "email" ? "email" : "admission number"} is already used by another member.`;
+      if (seen[key].has(v)) errors[i][key] = `Both members can't have the same ${key === "email" ? "college email" : "admission number"}. Enter Member ${i + 1}'s own.`;
       seen[key].add(v);
     }
   });

@@ -860,7 +860,7 @@ body > main, .site-footer { position: relative; z-index: 1; }
 .team-picker { max-width: 980px; margin: 0 auto; text-align: center; }
 .team-picker h1 { font: 400 clamp(2rem, 4vw, 3rem)/1.15 Georgia, serif; margin: 14px 0 10px; }
 .team-picker > p { color: var(--muted); margin-bottom: 36px; }
-.team-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.team-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; max-width: 680px; margin: 0 auto; }
 .team-option {
   display: flex;
   flex-direction: column;

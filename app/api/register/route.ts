@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   }
 
   const team = getTeamType(String(form.get("teamType") ?? ""));
-  if (!team) return NextResponse.json({ error: "Please choose Solo, Duo or Triplet." }, { status: 400 });
+  if (!team) return NextResponse.json({ error: "Please choose Solo or Duo." }, { status: 400 });
 
   // Fields arrive as m0_name, m0_photo, m1_name, ... Only known fields are kept.
   const members: Member[] = [];

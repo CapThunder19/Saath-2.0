@@ -1,5 +1,5 @@
 // Shrinks a photo in the browser before upload: phone photos are often 3–5 MB,
-// and Vercel rejects request bodies over 4.5 MB (a Triplet sends three photos).
+// and Vercel rejects request bodies over 4.5 MB (a Duo sends two photos).
 // 900px on the long side is still sharp on the ticket.
 export async function compressPhoto(file: File, maxSide = 900, quality = 0.85): Promise<File> {
   try {
