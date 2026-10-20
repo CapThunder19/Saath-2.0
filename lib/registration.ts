@@ -21,7 +21,7 @@ export const TICKET = {
   label: "Diwali Special Entry",
   date: "27 October",
   time: "4:00 PM – 6:30 PM",
-  venue: "College Amphitheater",
+  venue: "College Amphitheatre",
 };
 
 // Suggestions only: students can still type a course or branch that isn't listed.
