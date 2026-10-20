@@ -35,6 +35,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
   const [txnId, setTxnId] = useState("");
   const [txnError, setTxnError] = useState("");
   const [checking, setChecking] = useState(false);
+  const [busyNote, setBusyNote] = useState("");
 
   function clearError(i: number, key: keyof MemberErrors) {
     setErrors((all) => all.map((e, j) => (j === i && e[key] ? { ...e, [key]: undefined } : e)));
@@ -112,19 +113,30 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
     setSubmitting(true);
     setServerError("");
     try {
-      const res = await fetch("/api/register", { method: "POST", body });
-      const json = await res.json();
+      // When lots of people submit together the server may ask us to retry; do it
+      // automatically a few times before showing an error.
+      let res: Response;
+      let json: { registrationId?: string; error?: string; errors?: MemberErrors[]; txnError?: string; retry?: boolean };
+      for (let attempt = 0; ; attempt++) {
+        res = await fetch("/api/register", { method: "POST", body });
+        json = await res.json().catch(() => ({ error: "Something went wrong. Please try again." }));
+        if (!(res.status === 503 && json.retry) || attempt >= 3) break;
+        setBusyNote("Many people are registering right now. Retrying automatically, please wait…");
+        await new Promise((r) => setTimeout(r, 3000 + attempt * 3000 + Math.random() * 2000));
+      }
+      setBusyNote("");
       if (!res.ok) {
         if (json.txnError) setTxnError(json.txnError);
         // Problems with member details send the student back to that step.
-        if (Array.isArray(json.errors) && hasErrors(json.errors)) {
-          setErrors(json.errors);
+        const memberErrors = json.errors;
+        if (Array.isArray(memberErrors) && hasErrors(memberErrors)) {
+          setErrors(memberErrors);
           setStep("details");
-          setTimeout(() => focusFirstError(json.errors));
+          setTimeout(() => focusFirstError(memberErrors));
         }
         throw new Error(json.error || "Something went wrong.");
       }
-      setRegId(json.registrationId);
+      setRegId(json.registrationId!);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
@@ -208,6 +220,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
             {txnError && <span className="error-msg">{txnError}</span>}
           </div>
 
+          {busyNote && <p className="admin-notice">{busyNote}</p>}
           {serverError && serverError !== txnError && <p className="server-error">{serverError}</p>}
 
           <div className="form-nav">

@@ -38,11 +38,19 @@ function doPost(e) {
     return json({ ok: false, error: String(err) });
   }
 
+  // Registrations manage their own lock (see register) so photo uploads can run in parallel.
+  if (body.action !== "approve") {
+    try {
+      return register(body);
+    } catch (err) {
+      return json({ ok: false, error: String(err) });
+    }
+  }
+
   const lock = LockService.getScriptLock();
-  lock.waitLock(30000); // one write at a time, so duplicate checks are reliable
+  if (!lock.tryLock(30000)) return json({ ok: false, busy: true });
   try {
-    if (body.action === "approve") return json({ ok: true, result: approve(body.registrationId) });
-    return register(body);
+    return json({ ok: true, result: approve(body.registrationId) });
   } catch (err) {
     return json({ ok: false, error: String(err) });
   } finally {
@@ -51,37 +59,63 @@ function doPost(e) {
 }
 
 function register(body) {
-  const sheet = getSheet();
-  const rowsNow = dataRows();
-  const taken = new Set(rowsNow.map((r) => r[COL.admission].trim().toUpperCase()));
-  const duplicates = body.members
-    .map((m, i) => (taken.has(m.admissionNo.toUpperCase()) ? i : -1))
-    .filter((i) => i >= 0);
-  if (duplicates.length) return json({ ok: false, duplicates });
-  // One payment can only be used for one registration.
-  if (rowsNow.some((r) => r[COL.txnId].trim().toUpperCase() === body.txnId)) return json({ ok: false, duplicateTxn: true });
-
+  // Upload photos before taking the lock: it's the slow part (a second or more per
+  // photo) and doesn't need it, so many people's uploads can run at the same time.
   const folder = getFolder();
-  const submittedAt = new Date();
-  const rows = body.members.map((m, i) => {
-    const blob = Utilities.newBlob(
-      Utilities.base64Decode(m.photo.data),
-      m.photo.mimeType,
-      `${body.registrationId}-${i + 1}-${m.admissionNo}.${m.photo.ext}`,
-    );
-    const file = folder.createFile(blob);
-    return [
-      body.registrationId, submittedAt, body.teamType, `${i + 1} of ${body.members.length}`,
-      m.name, m.admissionNo, m.phone, m.course, m.branch, m.email, file.getUrl(), "Pending", "",
-      body.amount, body.txnId,
-    ];
-  });
+  const files = body.members.map((m, i) =>
+    folder.createFile(
+      Utilities.newBlob(
+        Utilities.base64Decode(m.photo.data),
+        m.photo.mimeType,
+        `${body.registrationId}-${i + 1}-${m.admissionNo}.${m.photo.ext}`,
+      ),
+    ),
+  );
+  const discardPhotos = () => files.forEach((f) => f.setTrashed(true));
 
-  const start = sheet.getLastRow() + 1;
-  // Store text columns as plain text so admission and phone numbers aren't turned into numbers.
-  sheet.getRange(start, 3, rows.length, HEADERS.length - 2).setNumberFormat("@");
-  sheet.getRange(start, 1, rows.length, HEADERS.length).setValues(rows);
-  return json({ ok: true });
+  // The lock is only held for the quick part: duplicate checks and adding the rows.
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(40000)) {
+    discardPhotos();
+    return json({ ok: false, busy: true });
+  }
+  try {
+    const sheet = getSheet();
+    const n = sheet.getLastRow() - 1;
+    // Only the two columns the checks need, not the whole sheet.
+    const column = (c) => (n > 0 ? sheet.getRange(2, c + 1, n, 1).getDisplayValues().map((r) => r[0].trim().toUpperCase()) : []);
+    const taken = new Set(column(COL.admission));
+    const duplicates = body.members
+      .map((m, i) => (taken.has(m.admissionNo.toUpperCase()) ? i : -1))
+      .filter((i) => i >= 0);
+    if (duplicates.length) {
+      discardPhotos();
+      return json({ ok: false, duplicates });
+    }
+    // One payment can only be used for one registration.
+    if (column(COL.txnId).includes(body.txnId)) {
+      discardPhotos();
+      return json({ ok: false, duplicateTxn: true });
+    }
+
+    const submittedAt = new Date();
+    const rows = body.members.map((m, i) => [
+      body.registrationId, submittedAt, body.teamType, `${i + 1} of ${body.members.length}`,
+      m.name, m.admissionNo, m.phone, m.course, m.branch, m.email, files[i].getUrl(), "Pending", "",
+      body.amount, body.txnId,
+    ]);
+    const start = sheet.getLastRow() + 1;
+    // Store text columns as plain text so admission and phone numbers aren't turned into numbers.
+    sheet.getRange(start, 3, rows.length, HEADERS.length - 2).setNumberFormat("@");
+    sheet.getRange(start, 1, rows.length, HEADERS.length).setValues(rows);
+    SpreadsheetApp.flush();
+    return json({ ok: true });
+  } catch (err) {
+    discardPhotos();
+    throw err;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function dataRows() {

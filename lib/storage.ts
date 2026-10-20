@@ -19,6 +19,9 @@ export type NewRegistration = {
 };
 export type Status = "Pending" | "Approved";
 
+/** The sheet was too busy (many people saving at once); safe to retry shortly. */
+export class BusyError extends Error {}
+
 // ok, or the indexes of members whose admission number is already registered,
 // or duplicateTxn when the payment's transaction ID was already used.
 export type SaveResult = { ok: true } | { ok: false; duplicates: number[]; duplicateTxn?: boolean };
@@ -136,12 +139,15 @@ async function callGoogle<T>({ url, secret }: { url: string; secret: string }, p
     body: JSON.stringify({ secret, ...payload }),
   });
   const text = await res.text();
-  let json: { ok?: boolean; result?: T; duplicates?: number[]; duplicateTxn?: boolean; error?: string };
+  let json: { ok?: boolean; result?: T; duplicates?: number[]; duplicateTxn?: boolean; busy?: boolean; error?: string };
   try {
     json = JSON.parse(text);
   } catch {
+    // Google refuses with an error page when too many script runs happen at once.
+    if (res.status === 429 || /too many|simultaneous|rate limit/i.test(text)) throw new BusyError("Google is rate-limiting.");
     throw new Error(`Google Apps Script returned non-JSON (status ${res.status}): ${text.slice(0, 200)}`);
   }
+  if (json.busy) throw new BusyError("The registrations sheet is busy.");
   if (json.duplicates) return { ok: false, duplicates: json.duplicates } as T;
   if (json.duplicateTxn) return { ok: false, duplicates: [], duplicateTxn: true } as T;
   if (!json.ok) {
@@ -151,6 +157,7 @@ async function callGoogle<T>({ url, secret }: { url: string; secret: string }, p
         "The deployed Apps Script is an old version. Paste the latest google-apps-script/Code.gs and redeploy (Deploy → Manage deployments → Edit → Version: New version).",
       );
     }
+    if (/too many|simultaneous|Lock timeout/i.test(json.error ?? "")) throw new BusyError(json.error);
     throw new Error(`Google Apps Script error: ${json.error ?? "unknown"}`);
   }
   return json.result ?? null;

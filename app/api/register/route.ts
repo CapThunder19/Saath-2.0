@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import {
   emptyMember,
@@ -9,7 +10,10 @@ import {
   validateTxnId,
   type Member,
 } from "@/lib/registration";
-import { saveRegistration, type Photo } from "@/lib/storage";
+import { BusyError, saveRegistration, type Photo } from "@/lib/storage";
+
+// No 0/O or 1/I, so IDs are easy to read out at the entry.
+const ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 // Apps Script can take a few seconds to save photos to Drive.
 export const maxDuration = 60;
@@ -71,7 +75,8 @@ export async function POST(req: Request) {
   const txnError = validateTxnId(txnId);
   if (txnError) return invalid(errors, txnError, 422, txnError);
 
-  const registrationId = "SAATH-" + Date.now().toString(36).toUpperCase().slice(-6);
+  // Random, not time-based: people submitting at the same moment must never share an ID.
+  const registrationId = "SAATH-" + Array.from(randomBytes(6), (b) => ID_CHARS[b % ID_CHARS.length]).join("");
   try {
     const result = await saveRegistration({ registrationId, teamType: team.id, amount: team.fee, txnId, members, photos });
     if (!result.ok && result.duplicateTxn) {
@@ -86,6 +91,9 @@ export async function POST(req: Request) {
     // Tickets become available in "View ticket" once an admin approves the registration.
     return NextResponse.json({ registrationId }, { status: 201 });
   } catch (err) {
+    if (err instanceof BusyError) {
+      return NextResponse.json({ error: "Many people are registering right now.", retry: true }, { status: 503 });
+    }
     console.error("Failed to save registration", err);
     return NextResponse.json({ error: "Could not save your registration. Please try again." }, { status: 500 });
   }
