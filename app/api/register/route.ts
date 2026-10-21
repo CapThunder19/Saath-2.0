@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import {
   emptyMember,
@@ -75,8 +75,12 @@ export async function POST(req: Request) {
   const txnError = validateTxnId(txnId);
   if (txnError) return invalid(errors, txnError, 422, txnError);
 
-  // Random, not time-based: people submitting at the same moment must never share an ID.
-  const registrationId = "SAATH-" + Array.from(randomBytes(6), (b) => ID_CHARS[b % ID_CHARS.length]).join("");
+  // Derived from the form's random submission key, so automatic retries of the same
+  // submission reuse one ID (and the sheet can recognise a repeat), while different
+  // people never collide. Falls back to random if the key is missing.
+  const key = String(form.get("submissionKey") ?? "");
+  const seed = /^[A-Za-z0-9-]{16,64}$/.test(key) ? createHash("sha256").update(key).digest() : randomBytes(6);
+  const registrationId = "SAATH-" + Array.from(seed.subarray(0, 6), (b) => ID_CHARS[b % ID_CHARS.length]).join("");
   try {
     const result = await saveRegistration({ registrationId, teamType: team.id, amount: team.fee, txnId, members, photos });
     if (!result.ok && result.duplicateTxn) {

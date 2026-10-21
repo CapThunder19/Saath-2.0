@@ -143,8 +143,11 @@ async function callGoogle<T>({ url, secret }: { url: string; secret: string }, p
   try {
     json = JSON.parse(text);
   } catch {
-    // Google refuses with an error page when too many script runs happen at once.
-    if (res.status === 429 || /too many|simultaneous|rate limit/i.test(text)) throw new BusyError("Google is rate-limiting.");
+    // Under heavy load Google answers with an HTML error page (e.g. 500 DEADLINE_EXCEEDED)
+    // instead of running the script. Safe to retry: registrations are idempotent.
+    if (res.status === 429 || res.status >= 500 || /too many|simultaneous|rate limit|DEADLINE_EXCEEDED/i.test(text)) {
+      throw new BusyError(`Google is overloaded (status ${res.status}).`);
+    }
     throw new Error(`Google Apps Script returned non-JSON (status ${res.status}): ${text.slice(0, 200)}`);
   }
   if (json.busy) throw new BusyError("The registrations sheet is busy.");
@@ -192,6 +195,7 @@ async function saveLocally(reg: NewRegistration): Promise<SaveResult> {
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
   const existing = await readLocal();
 
+  if (existing.some((r) => r.registrationId === reg.registrationId)) return { ok: true }; // retry of a saved submission
   const taken = new Set(existing.flatMap((r) => (r.members ?? []).map((m) => m.admissionNo)));
   const duplicates = reg.members.map((m, i) => (taken.has(m.admissionNo) ? i : -1)).filter((i) => i >= 0);
   if (duplicates.length) return { ok: false, duplicates };

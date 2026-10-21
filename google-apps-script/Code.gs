@@ -82,8 +82,13 @@ function register(body) {
   try {
     const sheet = getSheet();
     const n = sheet.getLastRow() - 1;
-    // Only the two columns the checks need, not the whole sheet.
+    // Only the columns the checks need, not the whole sheet.
     const column = (c) => (n > 0 ? sheet.getRange(2, c + 1, n, 1).getDisplayValues().map((r) => r[0].trim().toUpperCase()) : []);
+    // A retry of a submission that was already saved (its reply got lost): report success again.
+    if (column(COL.id).includes(body.registrationId)) {
+      discardPhotos();
+      return json({ ok: true });
+    }
     const taken = new Set(column(COL.admission));
     const duplicates = body.members
       .map((m, i) => (taken.has(m.admissionNo.toUpperCase()) ? i : -1))

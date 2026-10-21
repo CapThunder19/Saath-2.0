@@ -36,6 +36,8 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
   const [txnError, setTxnError] = useState("");
   const [checking, setChecking] = useState(false);
   const [busyNote, setBusyNote] = useState("");
+  // Same key for every retry of this form, so a retry can't create a second registration.
+  const [submissionKey] = useState(() => crypto.randomUUID());
 
   function clearError(i: number, key: keyof MemberErrors) {
     setErrors((all) => all.map((e, j) => (j === i && e[key] ? { ...e, [key]: undefined } : e)));
@@ -105,6 +107,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
     const body = new FormData();
     body.append("teamType", team.id);
     body.append("txnId", txnId);
+    body.append("submissionKey", submissionKey);
     members.forEach((m, i) => {
       for (const [k, v] of Object.entries(m)) body.append(`m${i}_${k}`, v);
       body.append(`m${i}_photo`, photos[i]!);
