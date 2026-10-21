@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findMember } from "@/lib/storage";
+import { checkAdmissions } from "@/lib/storage";
 
 // Checked before the payment step, so nobody pays for a registration that would
 // then be refused as "already registered". The final submit checks again.
@@ -9,9 +9,7 @@ export async function POST(req: Request) {
   if (admissionNos.length === 0) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
   try {
-    const found = await Promise.all(admissionNos.map((a) => (a ? findMember(a) : null)));
-    const taken = found.map((m, i) => (m ? i : -1)).filter((i) => i >= 0);
-    return NextResponse.json({ taken });
+    return NextResponse.json({ taken: await checkAdmissions(admissionNos) });
   } catch (err) {
     console.error("Admission check failed", err);
     return NextResponse.json({ error: "Could not check your details right now. Please try again." }, { status: 500 });

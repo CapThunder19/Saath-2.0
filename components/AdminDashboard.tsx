@@ -84,6 +84,7 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
           </p>
         </div>
         <div className="admin-head-actions">
+          <a className="btn btn-primary" href="/api/admin/export">Download Excel</a>
           <button className="btn btn-outline" onClick={() => router.refresh()}>Refresh</button>
           <button className="btn btn-outline" onClick={logout}>Sign out</button>
         </div>

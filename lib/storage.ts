@@ -1,11 +1,12 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Member } from "@/lib/registration";
 
 /**
- * With GOOGLE_SCRIPT_URL and GOOGLE_SCRIPT_SECRET set, registrations live in the Google
- * Sheet and photos in Drive (see google-apps-script/Code.gs). Without them (local
- * development), everything is saved under ./data instead.
+ * With SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY set, registrations live in Supabase
+ * (tables + functions from supabase/schema.sql) and photos in its "member-photos"
+ * storage bucket. Without them (local development), everything is saved under ./data.
  */
 
 export type Photo = { bytes: Buffer; ext: string; mimeType: string };
@@ -19,7 +20,7 @@ export type NewRegistration = {
 };
 export type Status = "Pending" | "Approved";
 
-/** The sheet was too busy (many people saving at once); safe to retry shortly. */
+/** The database couldn't be reached or was overloaded; safe to retry shortly. */
 export class BusyError extends Error {}
 
 // ok, or the indexes of members whose admission number is already registered,
@@ -39,25 +40,48 @@ export type AdminRegistration = {
   members: (Member & { memberNo: number })[];
 };
 
-export function saveRegistration(reg: NewRegistration): Promise<SaveResult> {
-  const google = googleConfig();
-  if (!google) return saveLocally(reg);
-  return callGoogle<SaveResult>(google, {
-    registrationId: reg.registrationId,
-    teamType: reg.teamType,
-    amount: reg.amount,
-    txnId: reg.txnId,
-    members: reg.members.map((m, i) => ({
-      ...m,
-      photo: { data: reg.photos[i].bytes.toString("base64"), ext: reg.photos[i].ext, mimeType: reg.photos[i].mimeType },
-    })),
-  }).then((r) => r ?? { ok: true });
+const BUCKET = "member-photos";
+
+export async function saveRegistration(reg: NewRegistration): Promise<SaveResult> {
+  const db = supabase();
+  if (!db) return saveLocally(reg);
+
+  // Same path on every retry of one submission, so a repeat just overwrites it.
+  const paths = reg.photos.map((p, i) => `${reg.registrationId}-${i + 1}.${p.ext}`);
+  await Promise.all(
+    reg.photos.map(async (p, i) => {
+      const { error } = await db.storage.from(BUCKET).upload(paths[i], p.bytes, { contentType: p.mimeType, upsert: true });
+      if (error) throw busyOr(error, "Photo upload failed");
+    }),
+  );
+
+  const result = await rpc<{ ok: boolean; repeat?: boolean; duplicates?: number[]; duplicateTxn?: boolean }>(db, "register_team", {
+    p_id: reg.registrationId,
+    p_team_type: reg.teamType,
+    p_amount: reg.amount,
+    p_txn_id: reg.txnId,
+    p_members: reg.members.map((m, i) => ({ ...m, photoPath: paths[i] })),
+  });
+  // If the call itself failed, the photos are kept on purpose: the registration may
+  // have been saved and only the reply lost, and the retry reuses the same paths.
+
+  if (result?.ok) return { ok: true };
+  await db.storage.from(BUCKET).remove(paths); // refused: these photos belong to nothing
+  return { ok: false, duplicates: result?.duplicates ?? [], duplicateTxn: result?.duplicateTxn };
+}
+
+/** Which of these admission numbers are already registered (indexes into the list). */
+export async function checkAdmissions(admissionNos: string[]): Promise<number[]> {
+  const db = supabase();
+  if (db) return (await rpc<number[]>(db, "check_admissions", { p_admissions: admissionNos })) ?? [];
+  const taken = new Set((await readLocal()).flatMap((r) => r.members.map((m) => m.admissionNo)));
+  return admissionNos.map((a, i) => (taken.has(a.trim().toUpperCase()) ? i : -1)).filter((i) => i >= 0);
 }
 
 /** Finds the registered member with this admission number, if any. */
 export async function findMember(admissionNo: string): Promise<FoundMember | null> {
-  const google = googleConfig();
-  if (google) return callGoogle(google, { action: "lookup", admissionNo });
+  const db = supabase();
+  if (db) return rpc<FoundMember>(db, "find_member", { p_admission: admissionNo });
   for (const r of await readLocal()) {
     const i = r.members.findIndex((m) => m.admissionNo === admissionNo);
     if (i >= 0) {
@@ -69,8 +93,19 @@ export async function findMember(admissionNo: string): Promise<FoundMember | nul
 
 /** Everything needed to draw one member's ticket, including their photo. */
 export async function getTicket(registrationId: string, memberNo: number): Promise<TicketData | null> {
-  const google = googleConfig();
-  if (google) return callGoogle(google, { action: "ticket", registrationId, memberNo });
+  const db = supabase();
+  if (db) {
+    const m = await rpc<Omit<TicketData, "photo"> & { photoPath: string }>(db, "get_member", {
+      p_id: registrationId,
+      p_member_no: memberNo,
+    });
+    if (!m) return null;
+    const { data, error } = await db.storage.from(BUCKET).download(m.photoPath);
+    let photo = "";
+    if (data && !error) photo = `data:${data.type || "image/jpeg"};base64,${Buffer.from(await data.arrayBuffer()).toString("base64")}`;
+    return { name: m.name, branch: m.branch, teamSize: m.teamSize, status: m.status, photo };
+  }
+
   const r = (await readLocal()).find((x) => x.registrationId === registrationId);
   const m = r?.members[memberNo - 1];
   if (!r || !m) return null;
@@ -86,28 +121,28 @@ export async function getTicket(registrationId: string, memberNo: number): Promi
   };
 }
 
-/** All registrations, newest first, for the admin dashboard (no photos). */
+/** All registrations, newest first, for the admin dashboard and Excel export (no photos). */
 export async function listRegistrations(): Promise<AdminRegistration[]> {
-  const google = googleConfig();
-  const regs: AdminRegistration[] = google
-    ? ((await callGoogle<AdminRegistration[]>(google, { action: "list" })) ?? [])
-    : (await readLocal()).map((r) => ({
-        registrationId: r.registrationId,
-        submittedAt: r.submittedAt,
-        teamType: r.teamType,
-        status: statusOf(r),
-        approvedAt: r.approvedAt ?? "",
-        amount: String(r.amount ?? ""),
-        txnId: r.txnId ?? "",
-        members: r.members.map(({ photo: _photo, ...m }, i) => ({ ...m, memberNo: i + 1 })),
-      }));
-  return regs.reverse();
+  const db = supabase();
+  if (db) return (await rpc<AdminRegistration[]>(db, "list_registrations", {})) ?? [];
+  return (await readLocal())
+    .map((r) => ({
+      registrationId: r.registrationId,
+      submittedAt: r.submittedAt,
+      teamType: r.teamType,
+      status: statusOf(r),
+      approvedAt: r.approvedAt ?? "",
+      amount: String(r.amount ?? ""),
+      txnId: r.txnId ?? "",
+      members: r.members.map(({ photo: _photo, ...m }, i) => ({ ...m, memberNo: i + 1 })),
+    }))
+    .reverse();
 }
 
 /** Marks a registration approved, so its members can open their tickets. */
 export async function approveRegistration(registrationId: string): Promise<{ approvedAt: string } | null> {
-  const google = googleConfig();
-  if (google) return callGoogle(google, { action: "approve", registrationId });
+  const db = supabase();
+  if (db) return rpc(db, "approve_registration", { p_id: registrationId });
 
   const regs = await readLocal();
   const r = regs.find((x) => x.registrationId === registrationId);
@@ -118,52 +153,37 @@ export async function approveRegistration(registrationId: string): Promise<{ app
   return { approvedAt: r.approvedAt };
 }
 
-// ---------- Google Apps Script ----------
+// ---------- Supabase ----------
 
-function googleConfig() {
-  const url = process.env.GOOGLE_SCRIPT_URL;
-  const secret = process.env.GOOGLE_SCRIPT_SECRET;
-  if (url && secret) return { url, secret };
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("GOOGLE_SCRIPT_URL and GOOGLE_SCRIPT_SECRET must be set in production.");
+let client: SupabaseClient | null | undefined;
+
+function supabase(): SupabaseClient | null {
+  if (client !== undefined) return client;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (url && key) {
+    client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  } else if (process.env.NODE_ENV === "production") {
+    throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in production.");
+  } else {
+    client = null;
   }
-  return null;
+  return client;
 }
 
-async function callGoogle<T>({ url, secret }: { url: string; secret: string }, payload: object): Promise<T | null> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    redirect: "follow", // Apps Script answers via a redirect to googleusercontent.com
-    cache: "no-store",
-    body: JSON.stringify({ secret, ...payload }),
-  });
-  const text = await res.text();
-  let json: { ok?: boolean; result?: T; duplicates?: number[]; duplicateTxn?: boolean; busy?: boolean; error?: string };
-  try {
-    json = JSON.parse(text);
-  } catch {
-    // Under heavy load Google answers with an HTML error page (e.g. 500 DEADLINE_EXCEEDED)
-    // instead of running the script. Safe to retry: registrations are idempotent.
-    if (res.status === 429 || res.status >= 500 || /too many|simultaneous|rate limit|DEADLINE_EXCEEDED/i.test(text)) {
-      throw new BusyError(`Google is overloaded (status ${res.status}).`);
-    }
-    throw new Error(`Google Apps Script returned non-JSON (status ${res.status}): ${text.slice(0, 200)}`);
+async function rpc<T>(db: SupabaseClient, fn: string, args: Record<string, unknown>): Promise<T | null> {
+  const { data, error, status } = await db.rpc(fn, args);
+  if (error) throw busyOr(error, `Database call ${fn} failed`, status);
+  return (data as T) ?? null;
+}
+
+// Network failures, timeouts and 5xx/429 answers are temporary: let the caller retry.
+function busyOr(error: { message?: string }, context: string, status?: number) {
+  const msg = `${context}: ${error.message ?? "unknown error"}`;
+  if (!status || status >= 500 || status === 429 || /fetch failed|timeout|network|ECONN/i.test(error.message ?? "")) {
+    return new BusyError(msg);
   }
-  if (json.busy) throw new BusyError("The registrations sheet is busy.");
-  if (json.duplicates) return { ok: false, duplicates: json.duplicates } as T;
-  if (json.duplicateTxn) return { ok: false, duplicates: [], duplicateTxn: true } as T;
-  if (!json.ok) {
-    // An old deployment doesn't know the newer actions and fails reading `members`.
-    if (json.error?.includes("reading 'map'")) {
-      throw new Error(
-        "The deployed Apps Script is an old version. Paste the latest google-apps-script/Code.gs and redeploy (Deploy → Manage deployments → Edit → Version: New version).",
-      );
-    }
-    if (/too many|simultaneous|Lock timeout/i.test(json.error ?? "")) throw new BusyError(json.error);
-    throw new Error(`Google Apps Script error: ${json.error ?? "unknown"}`);
-  }
-  return json.result ?? null;
+  return new Error(msg);
 }
 
 // ---------- Local development storage ----------
