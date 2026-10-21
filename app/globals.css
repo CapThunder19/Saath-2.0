@@ -630,7 +630,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--primary); outli
 }
 
 /* Diwali: maroon velvet, warm brass and gently glowing festive lights. */
-:root, :root[data-theme="light"], :root[data-theme="dark"] {
+/* One fixed look for everyone: also beats the old light/dark theme rules above, whatever the device setting. */
+:root, :root:not([data-theme]), :root[data-theme="light"], :root[data-theme="dark"] {
   color-scheme: dark;
   --primary: #f3ca82;
   --primary-dark: #ffe0a9;
@@ -656,7 +657,6 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--primary); outli
   --footer-line: #e5b56f36;
   --shadow: 0 12px 36px #16051040;
 }
-:root[data-theme="dark"] { --bg: #240916; --bg-alt: #390e21; --surface: #3c1125; --header-bg: #240916ed; --hero-bg: #390e2188; }
 body { background: var(--bg); }
 body > main, .site-footer { position: relative; z-index: 1; }
 .event-hero { background: linear-gradient(125deg, #6c203955, #390e2122); }
