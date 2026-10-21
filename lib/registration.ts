@@ -43,6 +43,9 @@ export const TEAM_TYPES = [
   { id: "duo", label: "Duo", size: 2, icon: "👥", blurb: "Register as a team of two.", fee: 30, payQr: "/pay/upi-duo-30.jpg" },
 ] as const;
 
+// Registered students are asked to join this group (shown after registering and in View ticket).
+export const WHATSAPP_GROUP = "https://chat.whatsapp.com/DxSVR10E56C0rYfdnwgpnw";
+
 // Where registration fees are paid (shown on the payment step).
 // `label` is only a display hint in the UPI app link; payment apps still show the account holder's verified name.
 export const UPI = { id: "vs0252464@oksbi", label: "HUHC Saath 2.0" };

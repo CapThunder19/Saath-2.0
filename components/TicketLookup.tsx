@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import WhatsAppJoin from "@/components/WhatsAppJoin";
 
 type Found = { name: string; registrationId: string; memberNo: number; teamSize: number; status: string; url: string | null };
 
@@ -70,6 +71,7 @@ export default function TicketLookup() {
             <Link href={found.url} className="btn btn-primary">
               Open my ticket →
             </Link>
+            <WhatsAppJoin compact />
           </div>
         ) : found ? (
           <div className="lookup-result is-pending">
@@ -80,6 +82,7 @@ export default function TicketLookup() {
               Hi {found.name.split(" ")[0]}, registration {found.registrationId} is being reviewed by the HUHC team. Once
               it&apos;s approved, your ticket will show up here. Please check back later.
             </p>
+            <WhatsAppJoin />
           </div>
         ) : (
           <div className="form-nav form-nav-end">

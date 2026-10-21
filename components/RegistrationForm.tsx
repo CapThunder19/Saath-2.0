@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { compressPhoto } from "@/lib/compressPhoto";
+import WhatsAppJoin from "@/components/WhatsAppJoin";
 import {
   BRANCHES,
   COLLEGE_EMAIL_DOMAIN,
@@ -161,6 +162,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
             Your payment will be verified by the HUHC team. After that, you can view your ticket in the{" "}
             <strong>View ticket</strong> section using your admission number and name.
           </p>
+          <WhatsAppJoin />
           <div className="tickets-actions">
             <Link href="/ticket" className="btn btn-primary">View ticket</Link>
             <Link href="/" className="btn btn-outline">Back to home</Link>
