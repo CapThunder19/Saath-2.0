@@ -12,7 +12,6 @@ import {
   ORG_NAME,
   PHOTO_PICK_MAX_BYTES,
   PHOTO_TYPES,
-  UPI,
   emptyMember,
   getTeamType,
   hasErrors,
@@ -173,7 +172,6 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
   }
 
   if (step === "payment") {
-    const upiLink = `upi://pay?pa=${UPI.id}&pn=${encodeURIComponent(UPI.label)}&am=${team.fee}&cu=INR&tn=${encodeURIComponent(`${EVENT.name} ${team.label}`)}`;
     return (
       <div className="form-wrapper">
         <div className="form-header">
@@ -189,12 +187,11 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
             <div className="payment-qr">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={team.payQr} alt={`UPI QR code to pay ₹${team.fee}`} />
-              <a className="btn btn-primary payment-app-btn" href={upiLink}>Pay ₹{team.fee} with UPI app</a>
             </div>
             <ol className="payment-steps">
               <li>
-                <strong>Scan the QR code</strong> with any UPI app (GPay, PhonePe, Paytm…). On a phone, tap{" "}
-                <em>Pay with UPI app</em> instead.
+                <strong>Scan the QR code</strong> with any UPI app (GPay, PhonePe, Paytm…). On a phone, take a screenshot
+                of the QR code and use <em>Scan from gallery</em> in your UPI app.
               </li>
               <li>
                 <strong>Enter the amount ₹{team.fee}</strong> yourself (the QR code doesn&apos;t fill it in) and complete the
