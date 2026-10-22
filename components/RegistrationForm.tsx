@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { compressPhoto } from "@/lib/compressPhoto";
+import { clearDraft, dataUrlToFile, fileToDataUrl, loadDraft, saveDraft } from "@/lib/formDraft";
 import WhatsAppJoin from "@/components/WhatsAppJoin";
 import {
   BRANCHES,
@@ -37,7 +38,58 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
   const [checking, setChecking] = useState(false);
   const [busyNote, setBusyNote] = useState("");
   // Same key for every retry of this form, so a retry can't create a second registration.
-  const [submissionKey] = useState(() => crypto.randomUUID());
+  const [submissionKey, setSubmissionKey] = useState(() => crypto.randomUUID());
+  const [restored, setRestored] = useState(false);
+  const [restoredNote, setRestoredNote] = useState(false);
+  const draftKey = `saath-registration-${team.id}`;
+
+  // Bring back a half-filled form (e.g. after paying in a UPI app, or the phone reloading the tab).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const d = loadDraft(draftKey, team.size);
+      if (d) {
+        const files = await Promise.all(d.photos.map((u, i) => (u ? dataUrlToFile(u, `photo-${i + 1}.jpg`).catch(() => null) : null)));
+        if (cancelled) return;
+        setMembers(d.members);
+        setPhotos(files);
+        setTxnId(d.txnId);
+        setSubmissionKey(d.submissionKey);
+        setStep(d.step);
+        if (d.step === "payment") window.history.pushState({ saathStep: "payment" }, "");
+        setRestoredNote(d.members.some((m) => m.name || m.admissionNo));
+      }
+      if (!cancelled) setRestored(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [draftKey, team.size]);
+
+  // Save as the student goes (only after the restore above, so it can't overwrite a draft with blanks).
+  useEffect(() => {
+    if (!restored || regId) return;
+    let cancelled = false;
+    (async () => {
+      const urls = await Promise.all(photos.map((f) => (f ? fileToDataUrl(f).catch(() => null) : null)));
+      if (!cancelled) saveDraft(draftKey, { members, photos: urls, step, txnId, submissionKey });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [restored, regId, draftKey, members, photos, step, txnId, submissionKey]);
+
+  // The browser's Back button on the payment step returns to the details step instead of leaving.
+  useEffect(() => {
+    const onPop = () => setStep("details");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  function backToDetails() {
+    if (window.history.state?.saathStep === "payment") window.history.back(); // fires popstate → details
+    else setStep("details");
+  }
 
   function clearError(i: number, key: keyof MemberErrors) {
     setErrors((all) => all.map((e, j) => (j === i && e[key] ? { ...e, [key]: undefined } : e)));
@@ -95,6 +147,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
     }
 
     setStep("payment");
+    window.history.pushState({ saathStep: "payment" }, "");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -139,6 +192,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
         }
         throw new Error(json.error || "Something went wrong.");
       }
+      clearDraft(draftKey);
       setRegId(json.registrationId!);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -175,7 +229,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
     return (
       <div className="form-wrapper">
         <div className="form-header">
-          <button type="button" className="form-back" onClick={() => setStep("details")}>← Back to details</button>
+          <button type="button" className="form-back" onClick={backToDetails}>← Back to details</button>
           <h1>Pay ₹{team.fee} to complete registration</h1>
           <p>
             {team.label} registration fee · {team.size === 1 ? "1 member" : `${team.size} members`}
@@ -183,6 +237,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
         </div>
 
         <form noValidate onSubmit={handleSubmit}>
+          {restoredNote && <p className="admin-notice">Welcome back! Your details were saved, so you can continue where you left off.</p>}
           <div className="payment">
             <div className="payment-qr">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -227,7 +282,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
           {serverError && serverError !== txnError && <p className="server-error">{serverError}</p>}
 
           <div className="form-nav">
-            <button type="button" className="btn btn-outline" onClick={() => setStep("details")}>← Back</button>
+            <button type="button" className="btn btn-outline" onClick={backToDetails}>← Back</button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
               {submitting ? "Submitting..." : "Submit registration"}
             </button>
@@ -251,6 +306,7 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
       </div>
 
       <form noValidate onSubmit={goToPayment}>
+        {restoredNote && <p className="admin-notice">Welcome back! Your details were saved, so you can continue where you left off.</p>}
         {members.map((m, i) => (
           <MemberFields
             key={i}
