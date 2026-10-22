@@ -193,11 +193,12 @@ export default function RegistrationForm({ teamType }: { teamType: TeamType }) {
             </div>
             <ol className="payment-steps">
               <li>
-                <strong>Scan the QR code</strong> with any UPI app (GPay, PhonePe, Paytm…) and pay exactly{" "}
-                <strong>₹{team.fee}</strong>. On a phone, tap <em>Pay with UPI app</em> instead.
+                <strong>Scan the QR code</strong> with any UPI app (GPay, PhonePe, Paytm…). On a phone, tap{" "}
+                <em>Pay with UPI app</em> instead.
               </li>
               <li>
-                Or pay to UPI ID <strong className="payment-upi">{UPI.id}</strong>.
+                <strong>Enter the amount ₹{team.fee}</strong> yourself (the QR code doesn&apos;t fill it in) and complete the
+                payment.
               </li>
               <li>
                 After paying, copy the <strong>UPI transaction ID (UTR)</strong> from your payment app and paste it below.
