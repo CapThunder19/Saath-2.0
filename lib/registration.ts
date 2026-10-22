@@ -48,7 +48,7 @@ export const WHATSAPP_GROUP = "https://chat.whatsapp.com/DxSVR10E56C0rYfdnwgpnw"
 
 // Where registration fees are paid (shown on the payment step).
 // `label` is only a display hint in the UPI app link; payment apps still show the account holder's verified name.
-export const UPI = { id: "vs0252464@oksbi", label: "HUHC Saath 2.0" };
+export const UPI = { id: "shauryalaptop1@oksbi", label: "HUHC Saath 2.0" };
 
 // UPI transaction IDs (UTR) are usually 12 digits; some apps show longer letter-and-number IDs.
 export const normalizeTxnId = (s: string) => s.replace(/\s+/g, "").toUpperCase();
