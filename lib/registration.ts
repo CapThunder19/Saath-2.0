@@ -40,8 +40,8 @@ export const PHOTO_PICK_MAX_BYTES = 15 * 1024 * 1024;
 // Registration fee per team size. One UPI QR code (no fixed amount) is used for both;
 // students type the amount shown on the payment page.
 export const TEAM_TYPES = [
-  { id: "solo", label: "Solo", size: 1, icon: "👤", blurb: "Register on your own.", fee: 20, payQr: "/pay/upi-qr.jpg" },
-  { id: "duo", label: "Duo", size: 2, icon: "👥", blurb: "Register as a team of two.", fee: 30, payQr: "/pay/upi-qr.jpg" },
+  { id: "solo", label: "Solo", size: 1, icon: "👤", blurb: "Register on your own.", fee: 20, payQr: "/pay/upi-qr.png" },
+  { id: "duo", label: "Duo", size: 2, icon: "👥", blurb: "Register as a team of two.", fee: 30, payQr: "/pay/upi-qr.png" },
 ] as const;
 
 // Registered students are asked to join this group (shown after registering and in View ticket).
