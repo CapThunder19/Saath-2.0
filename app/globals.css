@@ -1035,3 +1035,8 @@ body > main, .site-footer { position: relative; z-index: 1; }
 .whatsapp-btn:hover { background: #1ebe5a; border-color: #1ebe5a; }
 .whatsapp-btn svg { width: 20px; height: 20px; }
 .lookup-result.is-pending .whatsapp-join { align-self: stretch; }
+
+/* Admin: remove a registration */
+.admin-card > footer { justify-content: space-between; align-items: center; gap: 12px; }
+.admin-remove-btn { background: transparent; border-color: #ef444499; color: #fca5a5; }
+.admin-remove-btn:hover { background: #ef444426; border-color: #ef4444; }

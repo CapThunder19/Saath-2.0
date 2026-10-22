@@ -153,6 +153,29 @@ export async function approveRegistration(registrationId: string): Promise<{ app
   return { approvedAt: r.approvedAt };
 }
 
+/** Permanently deletes a registration, its members and their photos. Returns false if it didn't exist. */
+export async function removeRegistration(registrationId: string): Promise<boolean> {
+  const db = supabase();
+  if (db) {
+    const { data: members, error: readError } = await db.from("members").select("photo_path").eq("registration_id", registrationId);
+    if (readError) throw busyOr(readError, "Reading registration failed");
+    // Deleting the registration also deletes its member rows (on delete cascade).
+    const { data, error } = await db.from("registrations").delete().eq("id", registrationId).select("id");
+    if (error) throw busyOr(error, "Delete failed");
+    if (!data?.length) return false;
+    const paths = (members ?? []).map((m) => m.photo_path).filter(Boolean);
+    if (paths.length) await db.storage.from(BUCKET).remove(paths); // best effort: the registration is already gone
+    return true;
+  }
+
+  const regs = await readLocal();
+  const r = regs.find((x) => x.registrationId === registrationId);
+  if (!r) return false;
+  await fs.writeFile(DATA_FILE, JSON.stringify(regs.filter((x) => x !== r), null, 2));
+  await Promise.all(r.members.map((m) => fs.rm(path.join(DATA_DIR, m.photo), { force: true })));
+  return true;
+}
+
 // ---------- Supabase ----------
 
 let client: SupabaseClient | null | undefined;

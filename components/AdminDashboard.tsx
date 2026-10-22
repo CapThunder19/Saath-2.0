@@ -68,6 +68,39 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
     }
   }
 
+  async function remove(reg: Reg) {
+    const who = reg.members.map((m) => `${m.name} (${m.admissionNo})`).join(", ");
+    if (
+      !confirm(
+        `Permanently remove ${reg.registrationId}?
+
+${who}
+
+Their details, photos and tickets will be deleted and they can register again. This can't be undone.`,
+      )
+    )
+      return;
+    setBusy(reg.registrationId);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/admin/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrationId: reg.registrationId }),
+      });
+      if (res.status === 401) return router.replace("/ticket");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Could not remove. Please try again.");
+      setRegs((all) => all.filter((r) => r.registrationId !== reg.registrationId));
+      setNotice({ kind: "ok", text: `${reg.registrationId} removed.` });
+    } catch (err) {
+      setNotice({ kind: "error", text: err instanceof Error ? err.message : "Something went wrong." });
+    } finally {
+      setBusy(null);
+      router.refresh();
+    }
+  }
+
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
     router.replace("/ticket");
@@ -152,6 +185,9 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
             </div>
 
             <footer>
+              <button className="btn admin-remove-btn" disabled={busy === r.registrationId} onClick={() => remove(r)}>
+                Remove
+              </button>
               {r.status === "Approved" ? (
                 <span className="admin-approved-note">✓ Approved: tickets are live in View ticket</span>
               ) : (
