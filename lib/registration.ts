@@ -26,7 +26,7 @@ export const TICKET = {
 
 // Suggestions only: students can still type a course or branch that isn't listed.
 export const COURSES = ["B.Tech", "BCA", "BBA", "B.Com", "B.Sc", "BA", "MCA", "MBA", "M.Tech", "Diploma"];
-export const BRANCHES = ["CSE", "CSE (AI & ML)", "CSE (Data Science)", "IT", "ECE", "EE", "ME", "CE", "Biotechnology"];
+export const BRANCHES = ["CSE", "CSE (AI & ML)", "CSE (Data Science)", "IT", "ECE", "ELCE", "EE", "ME", "CE", "Biotechnology"];
 
 // Only official college email addresses are accepted. Set to "" to allow any email.
 export const COLLEGE_EMAIL_DOMAIN = "abes.ac.in";
