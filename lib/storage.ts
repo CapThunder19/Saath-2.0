@@ -91,6 +91,17 @@ export async function findMember(admissionNo: string): Promise<FoundMember | nul
   return null;
 }
 
+/** Members registered with this mobile number (several people may share one). */
+export async function findMembersByPhone(phone: string): Promise<{ admissionNo: string; name: string }[]> {
+  const db = supabase();
+  if (db) {
+    const { data, error } = await db.from("members").select("admission_no, name").eq("phone", phone);
+    if (error) throw busyOr(error, "Phone lookup failed");
+    return (data ?? []).map((m) => ({ admissionNo: m.admission_no, name: m.name }));
+  }
+  return (await readLocal()).flatMap((r) => r.members.filter((m) => m.phone === phone).map((m) => ({ admissionNo: m.admissionNo, name: m.name })));
+}
+
 /** Everything needed to draw one member's ticket, including their photo. */
 export async function getTicket(registrationId: string, memberNo: number): Promise<TicketData | null> {
   const db = supabase();

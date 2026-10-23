@@ -9,7 +9,9 @@ type Found = { name: string; registrationId: string; memberNo: number; teamSize:
 
 export default function TicketLookup() {
   const router = useRouter();
+  const [by, setBy] = useState<"admission" | "phone">("admission");
   const [admissionNo, setAdmissionNo] = useState("");
+  const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,7 +19,9 @@ export default function TicketLookup() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!admissionNo.trim() || !name.trim()) return setError("Please enter your admission number and name.");
+    if (by === "admission" && (!admissionNo.trim() || !name.trim())) return setError("Please enter your admission number and name.");
+    if (by === "phone" && !/^[6-9]\d{9}$/.test(phone)) return setError("Please enter your 10-digit mobile number.");
+    if (by === "phone" && !name.trim()) return setError("Please enter your name.");
     setLoading(true);
     setError("");
     setFound(null);
@@ -25,7 +29,7 @@ export default function TicketLookup() {
       const res = await fetch("/api/ticket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ admissionNo, name }),
+        body: JSON.stringify(by === "admission" ? { admissionNo, name } : { phone, name }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong.");
@@ -42,19 +46,53 @@ export default function TicketLookup() {
     <div className="form-wrapper lookup-wrapper">
       <div className="form-header">
         <h1>View your ticket</h1>
-        <p>Enter the admission number and name you registered with.</p>
+        <p>Enter your admission number or mobile number, and the name you registered with.</p>
       </div>
       <form noValidate onSubmit={handleSubmit}>
-        <div className="field">
-          <label htmlFor="lookup-admission">Admission number</label>
-          <input
-            id="lookup-admission"
-            value={admissionNo}
-            onChange={(e) => { setAdmissionNo(e.target.value); setFound(null); }}
-            autoCapitalize="characters"
-            placeholder="e.g. 2024BTCS0123"
-          />
+        <div className="lookup-by" role="tablist" aria-label="Find by">
+          {([["admission", "Admission number"], ["phone", "Mobile number"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={by === key}
+              className={by === key ? "is-active" : undefined}
+              onClick={() => {
+                setBy(key);
+                setFound(null);
+                setError("");
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+        {by === "admission" ? (
+          <div className="field">
+            <label htmlFor="lookup-admission">Admission number</label>
+            <input
+              id="lookup-admission"
+              value={admissionNo}
+              onChange={(e) => { setAdmissionNo(e.target.value); setFound(null); }}
+              autoCapitalize="characters"
+              placeholder="e.g. 2024BTCS0123"
+            />
+          </div>
+        ) : (
+          <div className="field">
+            <label htmlFor="lookup-phone">Mobile number</label>
+            <input
+              id="lookup-phone"
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              value={phone}
+              onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "")); setFound(null); }}
+              autoComplete="tel-national"
+              placeholder="10-digit number you registered with"
+            />
+          </div>
+        )}
         <div className="field">
           <label htmlFor="lookup-name">Full name</label>
           <input id="lookup-name" value={name} onChange={(e) => { setName(e.target.value); setFound(null); }} autoComplete="name" />

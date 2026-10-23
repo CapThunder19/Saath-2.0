@@ -1,31 +1,44 @@
 import { NextResponse } from "next/server";
 import { isAdminLogin, startAdminSession } from "@/lib/admin";
-import { findMember } from "@/lib/storage";
+import { findMember, findMembersByPhone } from "@/lib/storage";
 import { sameName, ticketPath } from "@/lib/tickets";
 
-const NOT_FOUND = "No registration found with these details. Check your admission number and enter your name exactly as you registered.";
+const NOT_FOUND =
+  "No registration found with these details. Check your admission number or mobile number, and enter your name exactly as you registered.";
 
-// Admission number + name → the member's ticket link (once approved), or the admin dashboard.
+// (Admission number or mobile number) + name → the member's ticket link (once approved),
+// or the admin dashboard for the admin's sign-in details.
 export async function POST(req: Request) {
-  let body: { admissionNo?: unknown; name?: unknown };
+  let body: { admissionNo?: unknown; phone?: unknown; name?: unknown };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
   const admissionNo = typeof body.admissionNo === "string" ? body.admissionNo.trim().toUpperCase() : "";
+  const phone = typeof body.phone === "string" ? body.phone.replace(/\D/g, "").slice(-10) : "";
   const name = typeof body.name === "string" ? body.name : "";
-  if (!admissionNo || !name.trim()) {
-    return NextResponse.json({ error: "Please enter your admission number and name." }, { status: 400 });
+  if ((!admissionNo && !phone) || !name.trim()) {
+    return NextResponse.json({ error: "Please enter your admission number or mobile number, and your name." }, { status: 400 });
+  }
+  if (!admissionNo && !/^[6-9]\d{9}$/.test(phone)) {
+    return NextResponse.json({ error: "Please enter a valid 10-digit mobile number." }, { status: 400 });
   }
 
-  if (isAdminLogin(admissionNo, name)) {
+  if (admissionNo && isAdminLogin(admissionNo, name)) {
     await startAdminSession();
     return NextResponse.json({ admin: true });
   }
 
   try {
-    const member = await findMember(admissionNo);
+    // By mobile number: pick the member with that number whose name matches.
+    let lookupAdmission = admissionNo;
+    if (!lookupAdmission) {
+      const match = (await findMembersByPhone(phone)).find((m) => sameName(m.name, name));
+      if (!match) return NextResponse.json({ error: NOT_FOUND }, { status: 404 });
+      lookupAdmission = match.admissionNo;
+    }
+    const member = await findMember(lookupAdmission);
     // Same message for "no such admission number" and "wrong name", so the form
     // can't be used to discover who has registered.
     if (!member || !sameName(member.name, name)) return NextResponse.json({ error: NOT_FOUND }, { status: 404 });

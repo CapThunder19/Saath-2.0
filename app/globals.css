@@ -1040,3 +1040,8 @@ body > main, .site-footer { position: relative; z-index: 1; }
 .admin-card > footer { justify-content: space-between; align-items: center; gap: 12px; }
 .admin-remove-btn { background: transparent; border-color: #ef444499; color: #fca5a5; }
 .admin-remove-btn:hover { background: #ef444426; border-color: #ef4444; }
+
+/* View ticket: find by admission number or mobile number */
+.lookup-by { display: flex; gap: 6px; margin-bottom: 18px; padding: 4px; border: 1px solid var(--line); border-radius: 99px; background: var(--bg-alt); }
+.lookup-by button { flex: 1; border: 0; background: none; color: var(--muted); font: inherit; font-size: .88rem; padding: 9px 12px; border-radius: 99px; cursor: pointer; }
+.lookup-by button.is-active { background: var(--primary); color: var(--on-primary); font-weight: 600; }
