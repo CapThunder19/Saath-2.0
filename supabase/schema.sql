@@ -251,3 +251,6 @@ begin
     end if;
   end loop;
 end $$;
+
+-- Make Supabase's API see new or changed functions right away.
+notify pgrst, 'reload schema';

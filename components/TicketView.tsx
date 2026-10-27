@@ -14,7 +14,8 @@ export default function TicketView({ approved, ...props }: TicketProps & { appro
   // The QR code opens this page (the signed ticket link), so entry volunteers can
   // scan a ticket and check it against the live record: an edited image won't match.
   useEffect(() => {
-    QRCode.toDataURL(window.location.href, { margin: 1, width: 240, errorCorrectionLevel: "M", color: { dark: "#4a0f1e", light: "#fdf0d5" } })
+    // Plain black on white with a quiet margin: the fastest, most reliable to scan off a phone screen.
+    QRCode.toDataURL(window.location.href, { margin: 2, width: 520, errorCorrectionLevel: "M", color: { dark: "#000000", light: "#ffffff" } })
       .then(setQr)
       .catch(() => setQr(undefined));
   }, []);
@@ -50,6 +51,13 @@ export default function TicketView({ approved, ...props }: TicketProps & { appro
           Registration ID <strong className="reg-id-inline">{props.registrationId}</strong>
           {props.teamSize > 1 && ` · Member ${props.memberNo} of ${props.teamSize}`}
         </p>
+        {approved && qr && (
+          <div className="entry-qr">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qr} alt="Entry QR code" />
+            <p>Show this QR at the entry gate. Turn your screen brightness up.</p>
+          </div>
+        )}
         <p>Show this ticket at the entry. Bookmark this page or copy the link to open it again anytime.</p>
         <div className="tickets-actions">
           <button className="btn btn-primary" onClick={download} disabled={busy || !qr}>

@@ -116,8 +116,16 @@ export default function TicketScanner({ isAdmin }: { isAdmin: boolean }) {
     setCamera("starting");
     setCameraError("");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
       streamRef.current = stream;
+      // Keep refocusing as tickets move closer/further (supported on most Android phones).
+      stream
+        .getVideoTracks()[0]
+        ?.applyConstraints({ advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] })
+        .catch(() => {});
       const video = videoRef.current!;
       video.srcObject = stream;
       await video.play();
@@ -132,33 +140,68 @@ export default function TicketScanner({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  // Scan loop: read a downscaled frame a few times a second and look for a QR code.
+  // Scan loop. Uses the phone's built-in QR reader when there is one (Chrome on Android:
+  // fast and good with screens); otherwise jsQR on a small crop of the frame's centre,
+  // alternating with the whole frame, so each attempt is quick.
   useEffect(() => {
     if (camera !== "on") return;
-    let raf = 0;
-    let last = 0;
-    const tick = (now: number) => {
-      raf = requestAnimationFrame(tick);
-      const video = videoRef.current;
-      if (!video || busyRef.current || now - last < 150 || video.readyState < 2) return;
-      last = now;
-      const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight));
-      const w = Math.round(video.videoWidth * scale);
-      const h = Math.round(video.videoHeight * scale);
+    let stopped = false;
+    type Detector = { detect: (source: HTMLVideoElement) => Promise<{ rawValue: string }[]> };
+    type DetectorClass = { new (o: { formats: string[] }): Detector; getSupportedFormats(): Promise<string[]> };
+    const Native = (window as unknown as { BarcodeDetector?: DetectorClass }).BarcodeDetector;
+    let detector: Detector | null = null;
+    let attempt = 0;
+
+    const decodeWithJsQR = (video: HTMLVideoElement) => {
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const full = attempt++ % 3 === 2; // every third try, look at the whole frame
+      const side = full ? Math.max(vw, vh) : Math.min(vw, vh) * 0.8;
+      const sx = full ? 0 : (vw - side) / 2;
+      const sy = full ? 0 : (vh - side) / 2;
+      const sw = full ? vw : side;
+      const sh = full ? vh : side;
+      const scale = Math.min(1, (full ? 640 : 480) / Math.max(sw, sh));
+      const w = Math.round(sw * scale);
+      const h = Math.round(sh * scale);
       const canvas = (canvasRef.current ??= document.createElement("canvas"));
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-      ctx.drawImage(video, 0, 0, w, h);
-      const code = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
-      if (!code?.data) return;
-      // The same ticket held in front of the camera shouldn't be checked again and again.
-      if (code.data === lastRef.current.text && now - lastRef.current.at < 6000) return;
-      lastRef.current = { text: code.data, at: now };
-      submit({ qr: code.data });
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+      return jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" })?.data;
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+
+    (async () => {
+      if (Native) {
+        try {
+          if ((await Native.getSupportedFormats()).includes("qr_code")) detector = new Native({ formats: ["qr_code"] });
+        } catch {
+          detector = null;
+        }
+      }
+      while (!stopped) {
+        const video = videoRef.current;
+        if (video && !busyRef.current && video.readyState >= 2 && video.videoWidth) {
+          let text: string | undefined;
+          try {
+            text = detector ? (await detector.detect(video))[0]?.rawValue : decodeWithJsQR(video);
+          } catch {
+            detector = null; // native reader failed on this device: use jsQR from now on
+          }
+          const now = Date.now();
+          // The same ticket held in front of the camera shouldn't be checked again and again.
+          if (text && !(text === lastRef.current.text && now - lastRef.current.at < 6000)) {
+            lastRef.current = { text, at: now };
+            submit({ qr: text });
+          }
+        }
+        await new Promise((r) => setTimeout(r, detector ? 50 : 80));
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
   }, [camera, submit]);
 
   useEffect(() => stopCamera, [stopCamera]);
