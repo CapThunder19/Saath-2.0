@@ -34,7 +34,6 @@ export default function TicketLookup() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong.");
       if (json.admin) return router.push("/admin");
-      if (json.scanner) return router.push("/scan");
       setFound(json);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");

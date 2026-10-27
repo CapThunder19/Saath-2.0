@@ -5,9 +5,17 @@ import { useEffect, useMemo, useState } from "react";
 import type { AdminRegistration } from "@/lib/storage";
 
 type Reg = AdminRegistration & { ticketLinks: string[] };
-type Filter = "Pending" | "Approved" | "All";
+type Filter = "Pending" | "Approved" | "Checked in" | "All";
 
-export default function AdminDashboard({ initial, error }: { initial: Reg[]; error: string }) {
+export default function AdminDashboard({
+  initial,
+  error,
+  checkInSetupNeeded = false,
+}: {
+  initial: Reg[];
+  error: string;
+  checkInSetupNeeded?: boolean;
+}) {
   const router = useRouter();
   const [regs, setRegs] = useState(initial);
   const [filter, setFilter] = useState<Filter>("Pending");
@@ -22,8 +30,11 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
     () => ({
       Pending: regs.filter((r) => r.status === "Pending").length,
       Approved: regs.filter((r) => r.status === "Approved").length,
+      "Checked in": regs.filter((r) => r.members.some((m) => m.checkedInAt)).length,
       All: regs.length,
       students: regs.reduce((n, r) => n + r.members.length, 0),
+      checkedIn: regs.reduce((n, r) => n + r.members.filter((m) => m.checkedInAt).length, 0),
+      approvedStudents: regs.filter((r) => r.status === "Approved").reduce((n, r) => n + r.members.length, 0),
     }),
     [regs],
   );
@@ -32,7 +43,7 @@ export default function AdminDashboard({ initial, error }: { initial: Reg[]; err
     const q = query.trim().toLowerCase();
     return regs.filter(
       (r) =>
-        (filter === "All" || r.status === filter) &&
+        (filter === "All" || (filter === "Checked in" ? r.members.some((m) => m.checkedInAt) : r.status === filter)) &&
         (!q ||
           r.registrationId.toLowerCase().includes(q) ||
           r.txnId.toLowerCase().includes(q) ||
@@ -101,6 +112,49 @@ Their details, photos and tickets will be deleted and they can register again. T
     }
   }
 
+  async function checkIn(reg: Reg, memberNo: number) {
+    const m = reg.members.find((x) => x.memberNo === memberNo)!;
+    if (!confirm(`Check in ${m.name} (${m.admissionNo})?`)) return;
+    const key = `${reg.registrationId}-${memberNo}`;
+    setBusy(key);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/admin/checkin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrationId: reg.registrationId, memberNo }),
+      });
+      if (res.status === 401) return router.replace("/ticket");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Could not check in. Please try again.");
+      if (json.status === "OK" || json.status === "ALREADY_IN") {
+        setRegs((all) =>
+          all.map((r) =>
+            r.registrationId === reg.registrationId
+              ? { ...r, members: r.members.map((x) => (x.memberNo === memberNo ? { ...x, checkedInAt: json.checkedInAt } : x)) }
+              : r,
+          ),
+        );
+        setNotice(
+          json.status === "OK"
+            ? { kind: "ok", text: `${m.name} checked in at ${formatTime(json.checkedInAt)}.` }
+            : { kind: "error", text: `${m.name} was already checked in at ${formatTime(json.checkedInAt)}. Don't allow a second entry.` },
+        );
+      } else {
+        const why: Record<string, string> = {
+          NOT_APPROVED: `${reg.registrationId} isn't approved yet, so it can't be checked in.`,
+          NOT_FOUND: "Registration not found (it may have been removed).",
+          SETUP_NEEDED: "Check-in isn't set up in the database yet. See the yellow box at the top.",
+        };
+        setNotice({ kind: "error", text: why[json.status] ?? "Could not check in." });
+      }
+    } catch (err) {
+      setNotice({ kind: "error", text: err instanceof Error ? err.message : "Something went wrong." });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
     router.replace("/ticket");
@@ -113,23 +167,31 @@ Their details, photos and tickets will be deleted and they can register again. T
           <span className="eyebrow">Saath 2.0 · Admin</span>
           <h1>Registrations</h1>
           <p>
-            {counts.All} registrations · {counts.students} students · {counts.Pending} waiting for approval
+            {counts.All} registrations · {counts.students} students · {counts.Pending} waiting for approval ·{" "}
+            <strong>
+              {counts.checkedIn} of {counts.approvedStudents} checked in
+            </strong>
           </p>
         </div>
         <div className="admin-head-actions">
-          <a className="btn btn-primary" href="/scan">Scan tickets</a>
-          <a className="btn btn-outline" href="/api/admin/export">Download Excel</a>
+          <a className="btn btn-primary" href="/api/admin/export">Download Excel</a>
           <button className="btn btn-outline" onClick={() => router.refresh()}>Refresh</button>
           <button className="btn btn-outline" onClick={logout}>Sign out</button>
         </div>
       </div>
 
       {error && <p className="server-error">{error}</p>}
+      {checkInSetupNeeded && (
+        <div className="admin-setup">
+          <strong>One-time setup for check-in:</strong> in Supabase → SQL Editor → New query, run this line, then refresh this page:
+          <code>alter table members add column if not exists checked_in_at timestamptz; notify pgrst, &apos;reload schema&apos;;</code>
+        </div>
+      )}
       {notice && <p className={notice.kind === "ok" ? "admin-notice" : "server-error"}>{notice.text}</p>}
 
       <div className="admin-toolbar">
         <div className="admin-tabs" role="tablist">
-          {(["Pending", "Approved", "All"] as Filter[]).map((f) => (
+          {(["Pending", "Approved", "Checked in", "All"] as Filter[]).map((f) => (
             <button key={f} role="tab" aria-selected={filter === f} className={filter === f ? "is-active" : undefined} onClick={() => setFilter(f)}>
               {f} <span>{counts[f]}</span>
             </button>
@@ -181,6 +243,18 @@ Their details, photos and tickets will be deleted and they can register again. T
                     <dt>Email</dt><dd>{m.email}</dd>
                   </dl>
                   <a className="admin-ticket-link" href={r.ticketLinks[i]} target="_blank" rel="noreferrer">View ticket ↗</a>
+                  {r.status === "Approved" &&
+                    (m.checkedInAt ? (
+                      <span className="admin-checked-in">✓ Checked in at {formatTime(m.checkedInAt)}</span>
+                    ) : (
+                      <button
+                        className="btn btn-primary admin-checkin-btn"
+                        disabled={busy === `${r.registrationId}-${m.memberNo}`}
+                        onClick={() => checkIn(r, m.memberNo)}
+                      >
+                        {busy === `${r.registrationId}-${m.memberNo}` ? "Checking in…" : "Check in"}
+                      </button>
+                    ))}
                 </div>
               ))}
             </div>
@@ -202,6 +276,11 @@ Their details, photos and tickets will be deleted and they can register again. T
       </div>
     </div>
   );
+}
+
+function formatTime(s: string) {
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? s : d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 // Sheet dates arrive as display strings; ISO strings come from local storage.

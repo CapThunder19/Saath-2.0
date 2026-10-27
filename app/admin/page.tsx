@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AdminDashboard from "@/components/AdminDashboard";
 import { isAdmin } from "@/lib/admin";
-import { listRegistrations, type AdminRegistration } from "@/lib/storage";
+import { checkInSetupNeeded, listRegistrations, type AdminRegistration } from "@/lib/storage";
 import { ticketPath } from "@/lib/tickets";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
@@ -13,6 +13,7 @@ export default async function AdminPage() {
 
   let registrations: (AdminRegistration & { ticketLinks: string[] })[] = [];
   let error = "";
+  const setupNeeded = await checkInSetupNeeded().catch(() => false);
   try {
     registrations = (await listRegistrations()).map((r) => ({
       ...r,
@@ -26,7 +27,7 @@ export default async function AdminPage() {
   return (
     <main className="form-page">
       <div className="container admin-container">
-        <AdminDashboard initial={registrations} error={error} />
+        <AdminDashboard initial={registrations} error={error} checkInSetupNeeded={setupNeeded} />
       </div>
     </main>
   );

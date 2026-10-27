@@ -28,6 +28,7 @@ export async function GET(req: Request) {
     { header: "UPI transaction ID", key: "txnId", width: 20 },
     { header: "Status", key: "status", width: 10 },
     { header: "Approved at", key: "approvedAt", width: 20 },
+    { header: "Checked in at", key: "checkedInAt", width: 20 },
     { header: "Photo", key: "photo", width: 14 },
   ];
   sheet.getRow(1).font = { bold: true };
@@ -51,13 +52,14 @@ export async function GET(req: Request) {
         txnId: r.txnId,
         status: r.status,
         approvedAt: when(r.approvedAt),
+        checkedInAt: when(m.checkedInAt ?? ""),
         photo: { text: "View photo", hyperlink: `${site}/api/admin/photo?id=${r.registrationId}-${m.memberNo}` },
       });
       for (const key of ["admissionNo", "phone", "txnId"]) row.getCell(key).numFmt = "@";
       row.getCell("photo").font = { color: { argb: "FF1D4ED8" }, underline: true };
     }
   }
-  sheet.autoFilter = { from: "A1", to: "O1" };
+  sheet.autoFilter = { from: "A1", to: "P1" };
 
   const buffer = await book.xlsx.writeBuffer();
   const date = new Date().toISOString().slice(0, 10);

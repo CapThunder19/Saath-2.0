@@ -168,72 +168,6 @@ exception when unique_violation then
   return jsonb_build_object('ok', false, 'error', 'duplicate ' || v_constraint);
 end $$;
 
--- ---------- Event-day entry (ticket scanner) ----------
-
--- One row per member who has entered. The primary key means a ticket can only be
--- checked in once, even if two gates scan it at the same moment.
-create table if not exists entries (
-  registration_id text not null,
-  member_no smallint not null,
-  entered_at timestamptz not null default now(),
-  primary key (registration_id, member_no),
-  foreign key (registration_id, member_no) references members (registration_id, member_no) on delete cascade
-);
-create index if not exists entries_entered_at on entries (entered_at desc);
-alter table entries enable row level security;
-
--- Checks a ticket at the gate and records the entry.
--- status: OK (let in) | ALREADY_IN (entered before, see enteredAt) | NOT_APPROVED | NOT_FOUND
-create or replace function check_in(p_id text, p_member_no integer)
-returns jsonb language plpgsql as $$
-declare
-  m record;
-  v_at timestamptz;
-  v_member jsonb;
-begin
-  select mm.name, mm.admission_no, mm.branch, mm.course, mm.phone, r.team_type, r.status,
-         (select count(*) from members x where x.registration_id = r.id) as team_size
-  into m
-  from members mm join registrations r on r.id = mm.registration_id
-  where r.id = p_id and mm.member_no = p_member_no;
-  if not found then
-    return jsonb_build_object('status', 'NOT_FOUND');
-  end if;
-
-  v_member := jsonb_build_object(
-    'registrationId', p_id, 'memberNo', p_member_no, 'teamSize', m.team_size, 'teamType', m.team_type,
-    'name', m.name, 'admissionNo', m.admission_no, 'branch', m.branch, 'course', m.course, 'phone', m.phone);
-
-  if m.status <> 'Approved' then
-    return jsonb_build_object('status', 'NOT_APPROVED', 'member', v_member);
-  end if;
-
-  insert into entries (registration_id, member_no) values (p_id, p_member_no)
-  on conflict do nothing
-  returning entered_at into v_at;
-  if v_at is not null then
-    return jsonb_build_object('status', 'OK', 'member', v_member,
-      'enteredAt', to_char(v_at at time zone 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS"+05:30"'));
-  end if;
-
-  select entered_at into v_at from entries where registration_id = p_id and member_no = p_member_no;
-  return jsonb_build_object('status', 'ALREADY_IN', 'member', v_member,
-    'enteredAt', to_char(v_at at time zone 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS"+05:30"'));
-end $$;
-
--- Everyone who has entered, newest first (for the scanner page and the Excel download).
-create or replace function list_entries()
-returns jsonb language sql stable as $$
-  select coalesce(jsonb_agg(jsonb_build_object(
-    'enteredAt', to_char(e.entered_at at time zone 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS"+05:30"'),
-    'registrationId', e.registration_id, 'memberNo', e.member_no, 'name', m.name, 'admissionNo', m.admission_no,
-    'branch', m.branch, 'course', m.course, 'phone', m.phone, 'teamType', r.team_type
-  ) order by e.entered_at desc), '[]')
-  from entries e
-  join members m on m.registration_id = e.registration_id and m.member_no = e.member_no
-  join registrations r on r.id = e.registration_id;
-$$;
-
 -- Only the server (service role) may call these.
 do $$
 declare f text;
@@ -241,8 +175,7 @@ begin
   foreach f in array array[
     'register_team(text, text, integer, text, jsonb)', 'check_admissions(jsonb)', 'find_member(text)',
     'get_member(text, integer)', 'list_registrations()', 'approve_registration(text)',
-    'import_registration(text, timestamptz, text, integer, text, text, timestamptz, jsonb)',
-    'check_in(text, integer)', 'list_entries()'
+    'import_registration(text, timestamptz, text, integer, text, text, timestamptz, jsonb)'
   ] loop
     execute format('revoke all on function %s from public', f);
     if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -252,5 +185,9 @@ begin
   end loop;
 end $$;
 
--- Make Supabase's API see new or changed functions right away.
+-- ---------- Event-day check-in ----------
+-- When an approved member arrived (set from the admin dashboard's "Check in" button).
+alter table members add column if not exists checked_in_at timestamptz;
+
+-- Make Supabase's API see new or changed columns/functions right away.
 notify pgrst, 'reload schema';

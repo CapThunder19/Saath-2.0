@@ -37,7 +37,7 @@ export type AdminRegistration = {
   approvedAt: string;
   amount: string;
   txnId: string;
-  members: (Member & { memberNo: number })[];
+  members: (Member & { memberNo: number; checkedInAt?: string })[];
 };
 
 const BUCKET = "member-photos";
@@ -135,7 +135,14 @@ export async function getTicket(registrationId: string, memberNo: number): Promi
 /** All registrations, newest first, for the admin dashboard and Excel export (no photos). */
 export async function listRegistrations(): Promise<AdminRegistration[]> {
   const db = supabase();
-  if (db) return (await rpc<AdminRegistration[]>(db, "list_registrations", {})) ?? [];
+  if (db) {
+    const regs = (await rpc<AdminRegistration[]>(db, "list_registrations", {})) ?? [];
+    // Attach check-in times (empty until the checked_in_at column has been added).
+    const { data } = await db.from("members").select("registration_id, member_no, checked_in_at").not("checked_in_at", "is", null);
+    const at = new Map((data ?? []).map((m) => [`${m.registration_id}-${m.member_no}`, m.checked_in_at as string]));
+    for (const r of regs) for (const m of r.members) m.checkedInAt = at.get(`${r.registrationId}-${m.memberNo}`);
+    return regs;
+  }
   return (await readLocal())
     .map((r) => ({
       registrationId: r.registrationId,
@@ -148,6 +155,58 @@ export async function listRegistrations(): Promise<AdminRegistration[]> {
       members: r.members.map(({ photo: _photo, ...m }, i) => ({ ...m, memberNo: i + 1 })),
     }))
     .reverse();
+}
+
+export type CheckInResult =
+  | { status: "OK" | "ALREADY_IN"; checkedInAt: string }
+  | { status: "NOT_APPROVED" | "NOT_FOUND" | "SETUP_NEEDED" };
+
+/** True until the checked_in_at column has been added in Supabase (see supabase/schema.sql). */
+export async function checkInSetupNeeded(): Promise<boolean> {
+  const db = supabase();
+  if (!db) return false;
+  const { error } = await db.from("members").select("checked_in_at").limit(1);
+  return !!error && /checked_in_at|column/i.test(error.message);
+}
+
+/** Records when an approved member arrived. A second check-in keeps the first time. */
+export async function checkInMember(registrationId: string, memberNo: number): Promise<CheckInResult> {
+  const db = supabase();
+  if (db) {
+    const { data: reg, error: regError } = await db.from("registrations").select("status").eq("id", registrationId).maybeSingle();
+    if (regError) throw busyOr(regError, "Check-in failed");
+    if (!reg) return { status: "NOT_FOUND" };
+    if (reg.status !== "Approved") return { status: "NOT_APPROVED" };
+
+    // Only sets the time if it isn't set yet, so two clicks can't overwrite the first check-in.
+    const now = new Date().toISOString();
+    const { data, error } = await db
+      .from("members")
+      .update({ checked_in_at: now })
+      .eq("registration_id", registrationId)
+      .eq("member_no", memberNo)
+      .is("checked_in_at", null)
+      .select("checked_in_at");
+    if (error) {
+      if (/checked_in_at|column/i.test(error.message)) return { status: "SETUP_NEEDED" };
+      throw busyOr(error, "Check-in failed");
+    }
+    if (data?.length) return { status: "OK", checkedInAt: data[0].checked_in_at };
+
+    const { data: m } = await db.from("members").select("checked_in_at").eq("registration_id", registrationId).eq("member_no", memberNo).maybeSingle();
+    if (!m) return { status: "NOT_FOUND" };
+    return { status: "ALREADY_IN", checkedInAt: m.checked_in_at };
+  }
+
+  const regs = await readLocal();
+  const r = regs.find((x) => x.registrationId === registrationId);
+  const m = r?.members[memberNo - 1];
+  if (!r || !m) return { status: "NOT_FOUND" };
+  if (statusOf(r) !== "Approved") return { status: "NOT_APPROVED" };
+  if (m.checkedInAt) return { status: "ALREADY_IN", checkedInAt: m.checkedInAt };
+  m.checkedInAt = new Date().toISOString();
+  await fs.writeFile(DATA_FILE, JSON.stringify(regs, null, 2));
+  return { status: "OK", checkedInAt: m.checkedInAt };
 }
 
 /** Marks a registration approved, so its members can open their tickets. */
@@ -185,65 +244,6 @@ export async function removeRegistration(registrationId: string): Promise<boolea
   await fs.writeFile(DATA_FILE, JSON.stringify(regs.filter((x) => x !== r), null, 2));
   await Promise.all(r.members.map((m) => fs.rm(path.join(DATA_DIR, m.photo), { force: true })));
   return true;
-}
-
-// ---------- Event-day entry ----------
-
-export type EntryMember = {
-  registrationId: string;
-  memberNo: number;
-  teamSize: number;
-  teamType: string;
-  name: string;
-  admissionNo: string;
-  branch: string;
-  course: string;
-  phone: string;
-};
-export type CheckInResult =
-  | { status: "OK" | "ALREADY_IN"; member: EntryMember; enteredAt: string }
-  | { status: "NOT_APPROVED"; member: EntryMember }
-  | { status: "NOT_FOUND" };
-export type Entry = Omit<EntryMember, "teamSize"> & { enteredAt: string };
-
-/** Records a member's entry at the gate (once only) after checking they're registered and approved. */
-export async function checkIn(registrationId: string, memberNo: number): Promise<CheckInResult> {
-  const db = supabase();
-  if (db) return (await rpc<CheckInResult>(db, "check_in", { p_id: registrationId, p_member_no: memberNo })) ?? { status: "NOT_FOUND" };
-
-  const regs = await readLocal();
-  const r = regs.find((x) => x.registrationId === registrationId);
-  const m = r?.members[memberNo - 1];
-  if (!r || !m) return { status: "NOT_FOUND" };
-  const member: EntryMember = {
-    registrationId, memberNo, teamSize: r.members.length, teamType: r.teamType,
-    name: m.name, admissionNo: m.admissionNo, branch: m.branch, course: m.course, phone: m.phone,
-  };
-  if (statusOf(r) !== "Approved") return { status: "NOT_APPROVED", member };
-  const entries = await readLocalEntries();
-  const prev = entries.find((e) => e.registrationId === registrationId && e.memberNo === memberNo);
-  if (prev) return { status: "ALREADY_IN", member, enteredAt: prev.enteredAt };
-  const enteredAt = new Date().toISOString();
-  entries.push({ registrationId, memberNo, enteredAt });
-  await fs.writeFile(ENTRIES_FILE, JSON.stringify(entries, null, 2));
-  return { status: "OK", member, enteredAt };
-}
-
-/** Everyone who has entered, newest first. */
-export async function listEntries(): Promise<Entry[]> {
-  const db = supabase();
-  if (db) return (await rpc<Entry[]>(db, "list_entries", {})) ?? [];
-  const regs = await readLocal();
-  return (await readLocalEntries())
-    .map((e) => {
-      const r = regs.find((x) => x.registrationId === e.registrationId);
-      const m = r?.members[e.memberNo - 1];
-      return r && m
-        ? { ...e, teamType: r.teamType, name: m.name, admissionNo: m.admissionNo, branch: m.branch, course: m.course, phone: m.phone }
-        : null;
-    })
-    .filter((e): e is Entry => e !== null)
-    .reverse();
 }
 
 // ---------- Supabase ----------
@@ -291,17 +291,8 @@ type StoredRegistration = Omit<NewRegistration, "photos" | "members" | "amount" 
   submittedAt: string;
   status?: Status;
   approvedAt?: string;
-  members: (Member & { photo: string })[];
+  members: (Member & { photo: string; checkedInAt?: string })[];
 };
-
-const ENTRIES_FILE = path.join(DATA_DIR, "entries.json");
-async function readLocalEntries(): Promise<{ registrationId: string; memberNo: number; enteredAt: string }[]> {
-  try {
-    return JSON.parse(await fs.readFile(ENTRIES_FILE, "utf8"));
-  } catch {
-    return [];
-  }
-}
 
 const statusOf = (r: StoredRegistration): Status => (r.status === "Approved" ? "Approved" : "Pending");
 

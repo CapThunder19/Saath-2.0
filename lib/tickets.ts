@@ -32,20 +32,6 @@ export function parseTicketId(id: string) {
   return m ? { registrationId: m[1], memberNo: Number(m[2]) } : null;
 }
 
-// Reads a scanned ticket QR: the full ticket link (https://…/ticket/SAATH-XXXXXX-2?t=…).
-// Returns null for anything that isn't a Saath ticket link.
-export function parseTicketLink(raw: string) {
-  try {
-    const url = new URL(raw.trim());
-    const m = /^\/ticket\/(SAATH-[A-Z0-9]+-[1-3])$/.exec(url.pathname);
-    if (!m) return null;
-    const parsed = parseTicketId(m[1]);
-    return parsed ? { ...parsed, ticketId: m[1], token: url.searchParams.get("t") ?? undefined } : null;
-  } catch {
-    return null;
-  }
-}
-
 // Names are compared ignoring case and extra spaces.
 export const sameName = (a: string, b: string) => {
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");

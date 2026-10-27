@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminLogin, isScannerLogin, startAdminSession, startScannerSession } from "@/lib/admin";
+import { isAdminLogin, startAdminSession } from "@/lib/admin";
 import { findMember, findMembersByPhone } from "@/lib/storage";
 import { sameName, ticketPath } from "@/lib/tickets";
 
@@ -7,7 +7,7 @@ const NOT_FOUND =
   "No registration found with these details. Check your admission number or mobile number, and enter your name exactly as you registered.";
 
 // (Admission number or mobile number) + name → the member's ticket link (once approved),
-// or the admin dashboard / gate scanner for those sign-in details.
+// or the admin dashboard for the admin's sign-in details.
 export async function POST(req: Request) {
   let body: { admissionNo?: unknown; phone?: unknown; name?: unknown };
   try {
@@ -28,10 +28,6 @@ export async function POST(req: Request) {
   if (admissionNo && isAdminLogin(admissionNo, name)) {
     await startAdminSession();
     return NextResponse.json({ admin: true });
-  }
-  if (admissionNo && isScannerLogin(admissionNo, name)) {
-    await startScannerSession();
-    return NextResponse.json({ scanner: true });
   }
 
   try {
