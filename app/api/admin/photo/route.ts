@@ -1,10 +1,10 @@
-import { isAdmin } from "@/lib/admin";
+import { canScan } from "@/lib/admin";
 import { getTicket } from "@/lib/storage";
 import { parseTicketId } from "@/lib/tickets";
 
-// Member photo for the admin dashboard: /api/admin/photo?id=SAATH-XXXXXX-1
+// Member photo for the admin dashboard and the gate scanner: /api/admin/photo?id=SAATH-XXXXXX-1
 export async function GET(req: Request) {
-  if (!(await isAdmin())) return new Response("Unauthorized", { status: 401 });
+  if (!(await canScan())) return new Response("Unauthorized", { status: 401 });
   const parsed = parseTicketId(new URL(req.url).searchParams.get("id") ?? "");
   if (!parsed) return new Response("Not found", { status: 404 });
 

@@ -2,10 +2,13 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { sameName } from "@/lib/tickets";
 
-// The admin signs in through "View ticket" with ADMIN_ADMISSION_NO + ADMIN_NAME
-// (set in .env.local). A signed cookie then keeps them signed in for 12 hours.
+// Two sign-ins, both typed into "View ticket" (admission number + name), set in .env.local:
+//   admin   — ADMIN_ADMISSION_NO + ADMIN_NAME     → dashboard (approve, remove, Excel) + scanner
+//   scanner — SCANNER_ADMISSION_NO + SCANNER_NAME → ticket scanner only (for gate volunteers)
+// A signed cookie then keeps each one signed in for 12 hours.
 
-const COOKIE = "huhc_admin";
+type Role = "admin" | "scanner";
+const COOKIE: Record<Role, string> = { admin: "huhc_admin", scanner: "huhc_scanner" };
 const SESSION_HOURS = 12;
 
 function secret() {
@@ -15,7 +18,9 @@ function secret() {
   return "dev-only-admin-secret";
 }
 
-const sign = (value: string) => createHmac("sha256", secret()).update(value).digest("base64url");
+// The role is part of what's signed, so a scanner cookie can never pass as an admin one.
+const sign = (role: Role, expires: string) =>
+  createHmac("sha256", secret()).update(role === "admin" ? expires : `${role}:${expires}`).digest("base64url");
 
 function safeEqual(a: string, b: string) {
   const x = Buffer.from(a);
@@ -23,16 +28,14 @@ function safeEqual(a: string, b: string) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-export function isAdminLogin(admissionNo: string, name: string) {
-  const id = process.env.ADMIN_ADMISSION_NO;
-  const adminName = process.env.ADMIN_NAME;
-  if (!id || !adminName) return false;
-  return safeEqual(admissionNo.trim().toUpperCase(), id.trim().toUpperCase()) && sameName(name, adminName);
+function matches(admissionNo: string, name: string, idVar: string | undefined, nameVar: string | undefined) {
+  if (!idVar || !nameVar) return false;
+  return safeEqual(admissionNo.trim().toUpperCase(), idVar.trim().toUpperCase()) && sameName(name, nameVar);
 }
 
-export async function startAdminSession() {
-  const expires = Date.now() + SESSION_HOURS * 3600 * 1000;
-  (await cookies()).set(COOKIE, `${expires}.${sign(String(expires))}`, {
+async function startSession(role: Role) {
+  const expires = String(Date.now() + SESSION_HOURS * 3600 * 1000);
+  (await cookies()).set(COOKIE[role], `${expires}.${sign(role, expires)}`, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -41,13 +44,30 @@ export async function startAdminSession() {
   });
 }
 
-export async function endAdminSession() {
-  (await cookies()).delete(COOKIE);
-}
-
-export async function isAdmin() {
-  const value = (await cookies()).get(COOKIE)?.value;
+async function hasSession(role: Role) {
+  const value = (await cookies()).get(COOKIE[role])?.value;
   if (!value) return false;
   const [expires, sig] = value.split(".");
-  return !!sig && Number(expires) > Date.now() && safeEqual(sig, sign(expires));
+  return !!sig && Number(expires) > Date.now() && safeEqual(sig, sign(role, expires));
+}
+
+export const isAdminLogin = (admissionNo: string, name: string) =>
+  matches(admissionNo, name, process.env.ADMIN_ADMISSION_NO, process.env.ADMIN_NAME);
+export const isScannerLogin = (admissionNo: string, name: string) =>
+  matches(admissionNo, name, process.env.SCANNER_ADMISSION_NO, process.env.SCANNER_NAME);
+
+export const startAdminSession = () => startSession("admin");
+export const startScannerSession = () => startSession("scanner");
+
+export async function endAdminSession() {
+  (await cookies()).delete(COOKIE.admin);
+}
+export async function endScannerSession() {
+  (await cookies()).delete(COOKIE.scanner);
+}
+
+export const isAdmin = () => hasSession("admin");
+/** Gate volunteers and admins may use the ticket scanner. */
+export async function canScan() {
+  return (await hasSession("scanner")) || (await hasSession("admin"));
 }

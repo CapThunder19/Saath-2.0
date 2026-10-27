@@ -6,3 +6,7 @@ next-env.d.ts
 .env*.local
 # submitted registrations contain personal data
 data/
+
+# Standalone scanner bundle (contains a .env with secrets) - never commit
+Saath-Scanner.zip
+Saath-Scanner/

@@ -187,6 +187,65 @@ export async function removeRegistration(registrationId: string): Promise<boolea
   return true;
 }
 
+// ---------- Event-day entry ----------
+
+export type EntryMember = {
+  registrationId: string;
+  memberNo: number;
+  teamSize: number;
+  teamType: string;
+  name: string;
+  admissionNo: string;
+  branch: string;
+  course: string;
+  phone: string;
+};
+export type CheckInResult =
+  | { status: "OK" | "ALREADY_IN"; member: EntryMember; enteredAt: string }
+  | { status: "NOT_APPROVED"; member: EntryMember }
+  | { status: "NOT_FOUND" };
+export type Entry = Omit<EntryMember, "teamSize"> & { enteredAt: string };
+
+/** Records a member's entry at the gate (once only) after checking they're registered and approved. */
+export async function checkIn(registrationId: string, memberNo: number): Promise<CheckInResult> {
+  const db = supabase();
+  if (db) return (await rpc<CheckInResult>(db, "check_in", { p_id: registrationId, p_member_no: memberNo })) ?? { status: "NOT_FOUND" };
+
+  const regs = await readLocal();
+  const r = regs.find((x) => x.registrationId === registrationId);
+  const m = r?.members[memberNo - 1];
+  if (!r || !m) return { status: "NOT_FOUND" };
+  const member: EntryMember = {
+    registrationId, memberNo, teamSize: r.members.length, teamType: r.teamType,
+    name: m.name, admissionNo: m.admissionNo, branch: m.branch, course: m.course, phone: m.phone,
+  };
+  if (statusOf(r) !== "Approved") return { status: "NOT_APPROVED", member };
+  const entries = await readLocalEntries();
+  const prev = entries.find((e) => e.registrationId === registrationId && e.memberNo === memberNo);
+  if (prev) return { status: "ALREADY_IN", member, enteredAt: prev.enteredAt };
+  const enteredAt = new Date().toISOString();
+  entries.push({ registrationId, memberNo, enteredAt });
+  await fs.writeFile(ENTRIES_FILE, JSON.stringify(entries, null, 2));
+  return { status: "OK", member, enteredAt };
+}
+
+/** Everyone who has entered, newest first. */
+export async function listEntries(): Promise<Entry[]> {
+  const db = supabase();
+  if (db) return (await rpc<Entry[]>(db, "list_entries", {})) ?? [];
+  const regs = await readLocal();
+  return (await readLocalEntries())
+    .map((e) => {
+      const r = regs.find((x) => x.registrationId === e.registrationId);
+      const m = r?.members[e.memberNo - 1];
+      return r && m
+        ? { ...e, teamType: r.teamType, name: m.name, admissionNo: m.admissionNo, branch: m.branch, course: m.course, phone: m.phone }
+        : null;
+    })
+    .filter((e): e is Entry => e !== null)
+    .reverse();
+}
+
 // ---------- Supabase ----------
 
 let client: SupabaseClient | null | undefined;
@@ -234,6 +293,15 @@ type StoredRegistration = Omit<NewRegistration, "photos" | "members" | "amount" 
   approvedAt?: string;
   members: (Member & { photo: string })[];
 };
+
+const ENTRIES_FILE = path.join(DATA_DIR, "entries.json");
+async function readLocalEntries(): Promise<{ registrationId: string; memberNo: number; enteredAt: string }[]> {
+  try {
+    return JSON.parse(await fs.readFile(ENTRIES_FILE, "utf8"));
+  } catch {
+    return [];
+  }
+}
 
 const statusOf = (r: StoredRegistration): Status => (r.status === "Approved" ? "Approved" : "Pending");
 

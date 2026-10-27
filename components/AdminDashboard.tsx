@@ -117,7 +117,8 @@ Their details, photos and tickets will be deleted and they can register again. T
           </p>
         </div>
         <div className="admin-head-actions">
-          <a className="btn btn-primary" href="/api/admin/export">Download Excel</a>
+          <a className="btn btn-primary" href="/scan">Scan tickets</a>
+          <a className="btn btn-outline" href="/api/admin/export">Download Excel</a>
           <button className="btn btn-outline" onClick={() => router.refresh()}>Refresh</button>
           <button className="btn btn-outline" onClick={logout}>Sign out</button>
         </div>
